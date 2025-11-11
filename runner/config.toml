@@ -1,9 +1,11 @@
-# Select backend + runtime instance here (edit to match your IBM account)
-backend      = "ibm_oslo"            # or "aer_simulator" for local Aer
-shots        = 400                   # hard cap
-instance     = "ibm-q/open/main"     # org/group/project for IBM Runtime
-use_runtime  = true                  # try Qiskit Runtime first, else provider
+# IBM backend + runtime instance
+backend      = "ibm_kyoto"           # large IBM device in Japan
+shots        = 400                    # hard cap per your cert budget
+instance     = "ibm-q/open/main"     # change if you use a different hub/group/project
+use_runtime  = true                   # try Qiskit Runtime first, else provider, else Aer
 
-# Challenge knobs (demo): n-qubits and a secret seed for keyed phase
-n_qubits     = 5
-key_seed     = 424242
+# Challenge knobs (demo)
+n_qubits     = 8
+key_seed     = 424242                 # trapdoor seed for keyed circuit
+
+acceptor     = "allzeros"

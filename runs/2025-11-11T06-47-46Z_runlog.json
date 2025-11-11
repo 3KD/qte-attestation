@@ -1,0 +1,8 @@
+{
+  "ts": "2025-11-11T06-47-46Z",
+  "backend": "ibm_kyoto",
+  "mode": "aer",
+  "shots": 400,
+  "job_id": "local",
+  "n_qubits": 5
+}
