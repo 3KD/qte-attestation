@@ -1,0 +1,98 @@
+{
+  "ts": "2025-11-11T19-55-37Z",
+  "backend": "ibm_torino",
+  "n_qubits": 8,
+  "shots_per_pair": 400,
+  "num_pairs": 13,
+  "total_shots": 5200,
+  "AUC": 0.9999994822485208,
+  "AUC_CI_95": [
+    0.999998446745562,
+    1.0
+  ],
+  "AUC_boot_mean": 0.9999995127126482,
+  "TPR_at_1pct_FPR": 1.0,
+  "min_PASS_r": 2,
+  "aggregate_keyed_top3": "00000000:3310, 10000000:432, 00000001:389",
+  "aggregate_forger_top3": "11111111:3076, 11111110:558, 11111011:305",
+  "ROC": [
+    {
+      "r": 0,
+      "TPR": 0.6365384615384615,
+      "FPR": 0.0,
+      "keyed_succ": 3310,
+      "forger_succ": 0
+    },
+    {
+      "r": 1,
+      "TPR": 0.9361538461538461,
+      "FPR": 0.0,
+      "keyed_succ": 4868,
+      "forger_succ": 0
+    },
+    {
+      "r": 2,
+      "TPR": 0.995,
+      "FPR": 0.0,
+      "keyed_succ": 5174,
+      "forger_succ": 0
+    },
+    {
+      "r": 3,
+      "TPR": 0.9998076923076923,
+      "FPR": 0.0001923076923076923,
+      "keyed_succ": 5199,
+      "forger_succ": 1
+    },
+    {
+      "r": 4,
+      "TPR": 1.0,
+      "FPR": 0.0003846153846153846,
+      "keyed_succ": 5200,
+      "forger_succ": 2
+    },
+    {
+      "r": 5,
+      "TPR": 1.0,
+      "FPR": 0.007884615384615384,
+      "keyed_succ": 5200,
+      "forger_succ": 41
+    },
+    {
+      "r": 6,
+      "TPR": 1.0,
+      "FPR": 0.08557692307692308,
+      "keyed_succ": 5200,
+      "forger_succ": 445
+    },
+    {
+      "r": 7,
+      "TPR": 1.0,
+      "FPR": 0.4084615384615385,
+      "keyed_succ": 5200,
+      "forger_succ": 2124
+    },
+    {
+      "r": 8,
+      "TPR": 1.0,
+      "FPR": 1.0,
+      "keyed_succ": 5200,
+      "forger_succ": 5200
+    }
+  ],
+  "source_paths": [
+    "/Users/erik/Documents/qte-attestation/runs/2025-11-11T19-55-22Z_submit_counts.jsonl",
+    "/Users/erik/Documents/qte-attestation/runs/2025-11-11T19-55-09Z_submit_counts.jsonl",
+    "/Users/erik/Documents/qte-attestation/runs/2025-11-11T19-54-52Z_submit_counts.jsonl",
+    "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-41-37Z_submit_counts.jsonl",
+    "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-41-26Z_submit_counts.jsonl",
+    "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-41-15Z_submit_counts.jsonl",
+    "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-41-04Z_submit_counts.jsonl",
+    "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-40-48Z_submit_counts.jsonl",
+    "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-40-37Z_submit_counts.jsonl",
+    "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-40-24Z_submit_counts.jsonl",
+    "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-40-13Z_submit_counts.jsonl",
+    "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-40-02Z_submit_counts.jsonl",
+    "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-39-50Z_submit_counts.jsonl"
+  ]
+}
