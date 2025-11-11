@@ -1,0 +1,9 @@
+[build-system] 
+requires = ["hatchling"]; build-backend = "hatchling.build"
+[project]
+name = "REPLACE_ME"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26","scipy>=1.11","pydantic>=2","pyyaml","rich","pytest","mypy","ruff"]
+[tool.ruff] line-length = 100
+[tool.mypy] python_version = "3.11"; warn_unused_ignores = true; strict = true

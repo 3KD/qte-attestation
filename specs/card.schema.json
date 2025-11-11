@@ -1,0 +1,11 @@
+{ "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "title":"qte.card", "type":"object",
+  "properties":{
+    "unit":{"type":"string"}, "mode":{"enum":["raw","cert"]},
+    "grid":{"type":"object"},
+    "lens":{"type":"string"}, "shots":{"type":"integer","maximum":400},
+    "backend":{"type":"string"}, "calibration_digest":{"type":"string"},
+    "ci":{"type":"object"}, "tail_bound":{"type":"object"},
+    "smoothing_sigma":{"type":"number"}
+  }, "required":["unit","mode","grid","lens","shots","backend"]
+}
