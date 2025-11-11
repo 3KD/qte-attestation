@@ -1,0 +1,15 @@
+{
+  "backend": "ibm_torino",
+  "mode": "runtime",
+  "n_qubits": 8,
+  "shots": 400,
+  "acceptor": "hamming_leq:4",
+  "keyed_succ": 400,
+  "forger_succ": 0,
+  "cp_lower_keyed": 0.9908201954163347,
+  "cp_upper_forg": 0.00917980458366526,
+  "alpha": 0.05,
+  "min_accept": 0.99,
+  "max_forge": 0.01,
+  "pass": true
+}

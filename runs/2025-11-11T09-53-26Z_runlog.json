@@ -1,0 +1,8 @@
+{
+  "ts": "2025-11-11T09-53-26Z",
+  "backend": "ibm_torino",
+  "mode": "runtime",
+  "shots": 400,
+  "job_id": "d49gf5i489vs73a1e2tg",
+  "n_qubits": 8
+}

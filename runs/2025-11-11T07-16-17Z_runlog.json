@@ -1,0 +1,8 @@
+{
+  "ts": "2025-11-11T07-16-17Z",
+  "backend": "ibm_fez",
+  "mode": "aer",
+  "shots": 400,
+  "job_id": "local",
+  "n_qubits": 8
+}

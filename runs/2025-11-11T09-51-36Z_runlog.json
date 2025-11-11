@@ -1,0 +1,8 @@
+{
+  "ts": "2025-11-11T09-51-36Z",
+  "backend": "ibm_marrakesh",
+  "mode": "runtime",
+  "shots": 400,
+  "job_id": "d49gea1lag1s73bj82tg",
+  "n_qubits": 8
+}

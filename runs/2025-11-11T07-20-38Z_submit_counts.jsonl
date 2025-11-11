@@ -1,0 +1,2 @@
+{"tag": "keyed", "backend": "ibm_marrakesh", "mode": "aer", "shots": 400, "n_qubits": 8, "counts": {"00000000": 400}}
+{"tag": "forger", "backend": "ibm_marrakesh", "mode": "aer", "shots": 400, "n_qubits": 8, "counts": {"11111111": 400}}
