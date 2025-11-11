@@ -1,0 +1,9 @@
+# Select backend + runtime instance here (edit to match your IBM account)
+backend      = "ibm_oslo"            # or "aer_simulator" for local Aer
+shots        = 400                   # hard cap
+instance     = "ibm-q/open/main"     # org/group/project for IBM Runtime
+use_runtime  = true                  # try Qiskit Runtime first, else provider
+
+# Challenge knobs (demo): n-qubits and a secret seed for keyed phase
+n_qubits     = 5
+key_seed     = 424242
