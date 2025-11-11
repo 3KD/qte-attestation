@@ -1,0 +1,15 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "title":"qte.attestation.counts",
+  "type":"object",
+  "properties":{
+    "keyed_succ":{"type":"integer","minimum":0},
+    "keyed_trials":{"type":"integer","minimum":1,"maximum":400},
+    "forg_succ":{"type":"integer","minimum":0},
+    "forg_trials":{"type":"integer","minimum":1,"maximum":400},
+    "alpha":{"type":"number","default":0.05},
+    "min_accept":{"type":"number","default":0.99},
+    "max_forge":{"type":"number","default":0.01}
+  },
+  "required":["keyed_succ","keyed_trials","forg_succ","forg_trials"]
+}
