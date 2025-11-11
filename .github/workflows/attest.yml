@@ -1,0 +1,36 @@
+name: attest
+on:
+  push:
+  pull_request:
+
+jobs:
+  run-attestation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install -U pip
+          pip install -e ".[dev]"
+          # Aer for local simulation; runtime optional but harmless
+          pip install qiskit qiskit-aer qiskit-ibm-runtime
+
+      - name: Run attestation (Aer)
+        run: |
+          source .venv/bin/activate
+          python runner/submit.py
+          python runner/harvest_and_verify.py
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runs
+          path: runs/*.json*
+          if-no-files-found: ignore
