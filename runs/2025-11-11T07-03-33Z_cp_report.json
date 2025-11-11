@@ -1,0 +1,20 @@
+{
+  "alpha": 0.05,
+  "targets": {
+    "min_accept": 0.99,
+    "max_forge": 0.01
+  },
+  "keyed": {
+    "succ": 400,
+    "trials": 400,
+    "cp_lower": 0.99082,
+    "pass": true
+  },
+  "forger": {
+    "succ": 0,
+    "trials": 400,
+    "cp_upper": 0.00918,
+    "pass": true
+  },
+  "PASS": true
+}
