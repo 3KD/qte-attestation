@@ -1,131 +1,136 @@
 #!/usr/bin/env python3
-import json, hashlib, hmac, base64, os, subprocess, time, sys
-from typing import Any, Tuple
+"""Utility helpers for canonical JSON provenance handling.
 
-# Canonical float/complex formatting (stable across runs)
-_FLOAT_FMT = "%.17g"
+This module powers both the provenance CLI (``python runner/provenance.py``)
+and lightweight helpers that other tooling can import.  Canonicalisation is
+performed with ``sort_keys=True`` and compact separators so that hashing is
+stable across platforms.  The hash domain explicitly excludes the top-level
+``provenance`` key allowing refreshes without perturbing the canonical payload.
+"""
 
-def _canon_val(x: Any):
-    import numpy as _np
-    if isinstance(x, float):
-        # stringify floats to lock repr
-        return {"__float__": _FLOAT_FMT % x}
-    if isinstance(x, complex):
-        return {"__complex__":[_FLOAT_FMT % x.real, _FLOAT_FMT % x.imag]}
-    if isinstance(x, (_np.floating,)):
-        return {"__float__": _FLOAT_FMT % float(x)}
-    if isinstance(x, (_np.integer,)):
-        return int(x)
-    if isinstance(x, (_np.complexfloating,)):
-        z = complex(x)
-        return {"__complex__":[_FLOAT_FMT % z.real, _FLOAT_FMT % z.imag]}
-    if isinstance(x, (list, tuple)):
-        return [_canon_val(v) for v in x]
-    if isinstance(x, dict):
-        return {k:_canon_val(x[k]) for k in sorted(x.keys())}
-    return x
+from __future__ import annotations
 
-def stable_dumps(obj: Any) -> str:
-    """Deterministic JSON string for hashing/signature."""
-    canon = _canon_val(obj)
-    return json.dumps(canon, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+import argparse
+import datetime
+import hashlib
+import hmac
+import json
+import os
+import pathlib
+import sys
+from typing import Dict, Mapping, Optional, Tuple
 
-def sha256_hex(s: str) -> str:
-    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+CANONICAL_SEPARATORS = (",", ":")
+CANONICAL_SORT_KEYS = True
+CANONICAL_EXCLUDE = ("provenance",)
 
-def hmac_sha256_b64(s: str, key: bytes) -> str:
-    return base64.b64encode(hmac.new(key, s.encode("utf-8"), hashlib.sha256).digest()).decode("ascii")
 
-def _openssl_sign(det_json: str, key_path: str) -> Tuple[str,str]:
-    """
-    Uses OpenSSL to produce a detached signature over the canonical JSON bytes.
-    Returns (sig_algo, sig_b64). Works with RSA/EC/Ed25519 private keys in PEM.
-    """
-    # Write temp file to sign
-    import tempfile, os
-    with tempfile.NamedTemporaryFile(delete=False) as tf:
-        tf.write(det_json.encode("utf-8"))
-        tmp = tf.name
-    try:
-        # Try generic pkeyutl (supports Ed25519/Ed448/RSA/ECDSA depending on key)
-        sig = subprocess.check_output(
-            ["openssl","pkeyutl","-sign","-inkey",key_path,"-pkeyopt","digest:sha256","-in",tmp],
-            stderr=subprocess.DEVNULL
-        )
-        # Probe key type for labeling
-        pub = subprocess.check_output(["openssl","pkey","-in",key_path,"-pubout"], stderr=subprocess.DEVNULL)
-        algo = "openssl-pkeyutl-sha256"
-        sig_b64 = base64.b64encode(sig).decode("ascii")
-        pub_pem = pub.decode("utf-8")
-        return (f"{algo}|{pub_pem.strip().splitlines()[0]}", sig_b64)
-    finally:
-        try: os.unlink(tmp)
-        except: pass
+def stable_dumps(data: object) -> str:
+    """Return the canonical JSON representation for *data*."""
 
-def attach_provenance(bundle: dict, *, key_id: str=None, hmac_key_env="PROV_HMAC_KEY",
-                      openssl_key_env="PROV_OPENSSL_KEY") -> dict:
-    """
-    Adds/overwrites bundle['provenance'] with canonical hash and optional signature.
-    - Always includes 'sha256' over canonical JSON.
-    - If PROV_HMAC_KEY is set, also includes 'hmac_sha256' with 'hmac_key_id'.
-    - If PROV_OPENSSL_KEY is set (path to PEM private key), also includes 'sig' and 'sig_algo'.
-    """
-    det = stable_dumps(bundle)
-    prov = {
-        "canonicalization": {"float_fmt": _FLOAT_FMT, "complex_tag": "__complex__", "float_tag": "__float__"},
-        "sha256": sha256_hex(det),
-        "created_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "tool": "provenance.py/v1"
+    return json.dumps(
+        data,
+        sort_keys=CANONICAL_SORT_KEYS,
+        separators=CANONICAL_SEPARATORS,
+        ensure_ascii=False,
+    )
+
+
+def sha256_hex(payload: str) -> str:
+    """Return the SHA-256 hex digest for ``payload``."""
+
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def hmac_sha256_hex(payload: str, key: str) -> str:
+    """Return the HMAC-SHA256 hex digest for ``payload`` using ``key``."""
+
+    return hmac.new(key.encode(), payload.encode(), hashlib.sha256).hexdigest()
+
+
+def canonical_payload(document: Mapping) -> str:
+    """Serialise *document* into its canonical form excluding provenance."""
+
+    payload = {k: v for k, v in document.items() if k not in CANONICAL_EXCLUDE}
+    return stable_dumps(payload)
+
+
+def compute_hashes(canon: str, hmac_key: Optional[str]) -> Tuple[str, Optional[str]]:
+    sha = sha256_hex(canon)
+    hm = hmac_sha256_hex(canon, hmac_key) if hmac_key else None
+    return sha, hm
+
+
+def attach_provenance(
+    path: pathlib.Path,
+    *,
+    key_id: Optional[str] = None,
+    hmac_env: str = "PROV_HMAC_KEY",
+) -> str:
+    """Attach or refresh provenance for ``path`` and return the SHA-256 claim."""
+
+    document = json.loads(path.read_text())
+    canon = canonical_payload(document)
+    sha, hm = compute_hashes(canon, os.getenv(hmac_env))
+
+    provenance: Dict[str, object] = dict(document.get("provenance", {}))
+    provenance.update(
+        {
+            "sha256": sha,
+            **({"hmac": hm} if hm else {}),
+            **({"key_id": key_id} if key_id else {}),
+            "ts": datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "canon": {
+                "separators": list(CANONICAL_SEPARATORS),
+                "sort_keys": CANONICAL_SORT_KEYS,
+                "exclude": list(CANONICAL_EXCLUDE),
+            },
+        }
+    )
+    document["provenance"] = provenance
+    path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+    print(f"[prov] attached: {path}")
+    print(f"sha256: {sha}")
+    return sha
+
+
+def verify_provenance(path: pathlib.Path, *, hmac_env: str = "PROV_HMAC_KEY") -> Dict[str, object]:
+    """Verify that the stored provenance claims match the canonical payload."""
+
+    document = json.loads(path.read_text())
+    claim = (document.get("provenance") or {}).get("sha256")
+    claim_hmac = (document.get("provenance") or {}).get("hmac")
+    canon = canonical_payload(document)
+    sha, hm = compute_hashes(canon, os.getenv(hmac_env))
+    result = {
+        "sha256_matches": (claim == sha),
+        "hmac_matches": (None if claim_hmac is None else claim_hmac == hm),
+        "sha256_actual": sha,
+        "sha256_claimed": claim,
     }
-    hkey = os.environ.get(hmac_key_env)
-    if hkey:
-        prov["hmac_sha256"] = hmac_sha256_b64(det, hkey.encode("utf-8"))
-        if key_id: prov["hmac_key_id"] = key_id
-    pkey = os.environ.get(openssl_key_env)
-    if pkey and os.path.exists(pkey):
-        algo, sig = _openssl_sign(det, pkey)
-        prov["sig_algo"] = algo
-        prov["sig_b64"] = sig
-    bundle["provenance"] = prov
-    return bundle
+    print(f"sha256: {sha}")
+    print(json.dumps(result, indent=2))
+    return result
 
-def verify_provenance(bundle: dict) -> dict:
-    """Recompute sha256 and compare with embedded; returns dict with booleans."""
-    det = stable_dumps(bundle)
-    out = {"sha256_matches": False, "hmac_matches": None}
-    prov = bundle.get("provenance") or {}
-    out["sha256_actual"] = sha256_hex(det)
-    out["sha256_claimed"] = prov.get("sha256")
-    out["sha256_matches"] = (out["sha256_actual"] == out["sha256_claimed"])
-    # HMAC check (if present and env provides key)
-    if "hmac_sha256" in prov:
-        key = os.environ.get("PROV_HMAC_KEY")
-        if key:
-            out["hmac_matches"] = (hmac_sha256_b64(det, key.encode("utf-8")) == prov["hmac_sha256"])
-        else:
-            out["hmac_matches"] = False
-    return out
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("path", help="path to JSON artifact")
+    p.add_argument("--attach", action="store_true", help="attach/refresh provenance and write back")
+    p.add_argument("--verify", action="store_true", help="verify against stored provenance claims")
+    p.add_argument("--key-id", default=None, help="optional key identifier to record in provenance")
+    p.add_argument("--hmac-env", default="PROV_HMAC_KEY", help="env var name that holds HMAC key")
+    args = p.parse_args()
 
-def cli():
-    import argparse, pathlib
-    ap = argparse.ArgumentParser(description="Provenance: canonical hash / attach / verify")
-    ap.add_argument("path", help="JSON file to process (input; will be updated in-place if --attach)")
-    ap.add_argument("--attach", action="store_true", help="Attach provenance into the JSON (in-place)")
-    ap.add_argument("--key-id", default=None, help="Label for HMAC key (metadata only)")
-    ap.add_argument("--verify", action="store_true", help="Verify embedded provenance")
-    args = ap.parse_args()
+    path = pathlib.Path(args.path)
+    if not path.exists():
+        print(f"[prov] ERROR: not found: {path}", file=sys.stderr)
+        sys.exit(2)
 
-    p = pathlib.Path(args.path)
-    data = json.loads(p.read_text())
     if args.attach:
-        attach_provenance(data, key_id=args.key_id)
-        p.write_text(json.dumps(data, indent=2))
-        print("[prov] attached:", p)
-    det = stable_dumps(data)
-    print("sha256:", sha256_hex(det))
-    if args.verify:
-        res = verify_provenance(data)
-        print(json.dumps(res, indent=2))
+        attach_provenance(path, key_id=args.key_id, hmac_env=args.hmac_env)
+    # Default to verify if not attaching (or do both if both flags set)
+    if args.verify or not args.attach:
+        verify_provenance(path, hmac_env=args.hmac_env)
 
 if __name__ == "__main__":
-    cli()
+    main()
