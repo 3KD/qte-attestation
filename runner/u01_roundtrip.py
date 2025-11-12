@@ -13,7 +13,8 @@ Returns exit code 0 on success; prints details.
 """
 import importlib, json, sys, time
 from pathlib import Path
-from provenance import stable_dumps, sha256_hex
+
+from runner.provenance import sha256_hex, stable_dumps
 
 def _ok(msg): print("[u01-rt]", msg)
 
