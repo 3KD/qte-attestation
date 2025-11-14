@@ -1,0 +1,9 @@
+{
+  "average_fidelity": 1.0000000000000002,
+  "label": "E1-T2_nvade_phase_ramanujan_n6_m6",
+  "message_bits": 6,
+  "min_fidelity": 1.0000000000000004,
+  "n_qubits": 6,
+  "n_trials": 5000,
+  "seed": 424242
+}
