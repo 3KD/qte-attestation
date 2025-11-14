@@ -1,0 +1,269 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+
+\title{Unit R -- Randomness Source Certificate (NVADE--RND)}
+\author{E. Dollarhide}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Informal goal}
+
+Unit R (NVADE--RND) turns a batch of classical bitstrings into a
+\emph{cryptographically auditable randomness certificate}.
+It does \emph{not} prove ``true randomness'' in the metaphysical sense.
+Instead, it certifies that:
+
+\begin{itemize}
+  \item the observed strings are statistically consistent with an i.i.d.\ source
+        of a specified min--entropy rate, and
+  \item the entire experiment (source, sampling, tests, and thresholds) is
+        bound into a NVADE--style JSON card with a content hash.
+\end{itemize}
+
+The certificate is designed so that a regulator, counterparty, or external
+verifier can re-run the analysis on the same raw data and reach the same
+pass/fail verdict, or detect any tampering.
+
+\section{Setting and notation}
+
+Let $n \ge 1$ be the bit-length of each trial.
+A randomness source produces $N$ independent samples
+\[
+  X^{(1)},\dots,X^{(N)} \in \{0,1\}^n.
+\]
+Write $x^{(i)} = (x^{(i)}_1,\dots,x^{(i)}_n)$ for the bits in the $i$--th sample.
+
+Let $\mathcal{X} = \{0,1\}^n$ and denote by
+\[
+  \hat p(x) = \frac{1}{N} \sum_{i=1}^N \mathbf{1}\{X^{(i)} = x\}, \qquad x \in \mathcal{X}
+\]
+the empirical distribution on $\mathcal{X}$.
+The ideal reference distribution for a perfectly uniform source is
+\[
+  u(x) = 2^{-n}, \qquad x \in \mathcal{X}.
+\]
+
+The (Shannon) entropy of a distribution $p$ on $\mathcal{X}$ is
+\[
+  H(p) = - \sum_{x \in \mathcal{X}} p(x) \log_2 p(x),
+\]
+and its min--entropy is
+\[
+  H_{\min}(p) = -\log_2 \Big( \max_{x \in \mathcal{X}} p(x) \Big).
+\]
+
+\section{Statistical model and target}
+
+Unit R does not try to characterise the full device physics.
+Instead, it treats the randomness source as a black box and works with the
+following minimal model.
+
+\paragraph{Model R.1 (i.i.d.\ source).}
+There exists an unknown distribution $P^\star$ on $\mathcal{X}$ such that
+$X^{(1)},\dots,X^{(N)}$ are i.i.d.\ draws from $P^\star$.
+
+\paragraph{Target.}
+Given the observed empirical distribution $\hat p$ and parameters
+$\varepsilon_H > 0$, $\varepsilon_{\min} > 0$, and confidence level
+$1 - \delta$, we want to produce a certificate stating that with probability
+at least $1-\delta$ (over the sampling of $X^{(i)}$),
+\begin{align*}
+  H(P^\star) &\ge H(\hat p) - \varepsilon_H, \\
+  H_{\min}(P^\star) &\ge H_{\min}(\hat p) - \varepsilon_{\min}.
+\end{align*}
+Equivalently, we bound how far the \emph{true} entropy and min--entropy
+can deviate below the empirical values.
+
+These bounds are finite--sample and non--asymptotic: they should hold for
+moderate $N$ (e.g.\ $10^4$--$10^6$).
+
+\section{Concentration bounds}
+
+Let $K = 2^n$ be the alphabet size.
+Standard concentration inequalities control the deviation between the
+empirical distribution $\hat p$ and the true distribution $P^\star$.
+Define the total variation distance
+\[
+  \mathrm{TV}(\hat p, P^\star)
+  = \frac{1}{2} \sum_{x \in \mathcal{X}} |\hat p(x) - P^\star(x)|.
+\]
+
+\subsection{Dvoretzky--Kiefer--Wolfowitz (DKW) style bound}
+
+A simple but conservative approach is to use a union bound over all
+$K$ outcomes.
+Let $\epsilon > 0$.
+For each fixed $x \in \mathcal{X}$, Hoeffding's inequality gives
+\[
+  \mathbb{P}\Big( |\hat p(x) - P^\star(x)| > \epsilon \Big)
+  \le 2 \exp\big( -2 N \epsilon^2 \big).
+\]
+By a union bound over $K$ outcomes,
+\[
+  \mathbb{P}\Big( \max_{x} |\hat p(x) - P^\star(x)| > \epsilon \Big)
+  \le 2K \exp\big( -2 N \epsilon^2 \big).
+\]
+Set the right-hand side equal to $\delta$ and solve for $\epsilon$:
+\[
+  \epsilon_N
+  = \sqrt{ \frac{1}{2N} \big( \ln(2K) + \ln(1/\delta) \big) }.
+\]
+Then with probability at least $1-\delta$,
+\[
+  \max_x |\hat p(x) - P^\star(x)| \le \epsilon_N.
+\]
+
+This immediately implies a total variation bound
+\[
+  \mathrm{TV}(\hat p, P^\star) \le \frac{K}{2} \epsilon_N,
+\]
+which is too loose when $K$ is large, but sufficient for a first
+implementation with moderate $n$ (e.g.\ $n \le 16$).
+
+\subsection{Entropy and min--entropy deviations}
+
+We now convert a bound on $\|\hat p - P^\star\|_1$
+into bounds on $H(P^\star)$ and $H_{\min}(P^\star)$.
+
+\paragraph{Shannon entropy.}
+The map $p \mapsto H(p)$ is 1--Lipschitz with respect to $\ell_1$
+up to logarithmic factors.
+A standard bound (see, e.g., Cover--Thomas) is
+\[
+  |H(P^\star) - H(\hat p)|
+  \le \|\hat p - P^\star\|_1 \log_2\Big( \frac{K}{\|\hat p - P^\star\|_1} \Big)
+  + H_b\big( \|\hat p - P^\star\|_1 \big),
+\]
+where $H_b$ is the binary entropy function.
+Let $\eta = \|\hat p - P^\star\|_1$.
+Substituting any upper bound $\eta \le \eta_N$ yields a computable
+entropy interval
+\[
+  H(P^\star) \ge H(\hat p) - \varepsilon_H(\eta_N),
+\]
+where
+\[
+  \varepsilon_H(\eta_N)
+  = \eta_N \log_2\Big( \frac{K}{\eta_N} \Big) + H_b(\eta_N).
+\]
+
+\paragraph{Min--entropy.}
+Min--entropy is more sensitive to the maximum probability mass.
+Let $p_{\max} = \max_x P^\star(x)$ and $\hat p_{\max} = \max_x \hat p(x)$.
+If $\|\hat p - P^\star\|_\infty \le \epsilon_N$, then
+\[
+  p_{\max} \le \hat p_{\max} + \epsilon_N,
+\]
+and hence
+\[
+  H_{\min}(P^\star)
+  = -\log_2 p_{\max}
+  \ge -\log_2(\hat p_{\max} + \epsilon_N)
+  = H_{\min}(\hat p) - \varepsilon_{\min},
+\]
+with
+\[
+  \varepsilon_{\min}
+  = \log_2\Big( \frac{\hat p_{\max} + \epsilon_N}{\hat p_{\max}} \Big).
+\]
+
+\subsection{Choice of parameters in practice}
+
+Unit R exposes a small set of user--visible parameters:
+
+\begin{itemize}
+  \item $N$: number of samples (bitstrings),
+  \item $n$: bits per sample,
+  \item $\delta$: target confidence (e.g.\ $10^{-6}$),
+  \item $\varepsilon_H^{\mathrm{target}}$: acceptable entropy loss (e.g.\ $0.01$ bits),
+  \item $\varepsilon_{\min}^{\mathrm{target}}$: acceptable min--entropy loss.
+\end{itemize}
+
+The implementation selects the smallest $\epsilon_N$ (hence smallest
+$\eta_N$ and $\varepsilon_H$) compatible with the chosen $N$ and $\delta$.
+If the resulting $(\varepsilon_H,\varepsilon_{\min})$ are below the
+targets, the card is marked as ``RND--PASS''.
+
+\section{Certificate schema (JSON view)}
+
+A Unit R card is a NVADE--style JSON object with at least the following
+fields (keys are indicative):
+
+\begin{itemize}
+  \item \texttt{"unit"}: \texttt{"UnitR\_RandomnessCertificate"}.
+  \item \texttt{"version"}: semantic version of the spec.
+  \item \texttt{"n\_bits"}: $n$.
+  \item \texttt{"n\_samples"}: $N$.
+  \item \texttt{"confidence\_delta"}: $\delta$.
+  \item \texttt{"empirical\_entropy"}: $H(\hat p)$.
+  \item \texttt{"empirical\_min\_entropy"}: $H_{\min}(\hat p)$.
+  \item \texttt{"epsilon\_TV\_bound"}: $\eta_N$ or a tighter bound.
+  \item \texttt{"epsilon\_H"}: $\varepsilon_H$.
+  \item \texttt{"epsilon\_Hmin"}: $\varepsilon_{\min}$.
+  \item \texttt{"entropy\_lower\_bound"}: $H(\hat p) - \varepsilon_H$.
+  \item \texttt{"min\_entropy\_lower\_bound"}:
+        $H_{\min}(\hat p) - \varepsilon_{\min}$.
+  \item \texttt{"raw\_data\_hash"}:
+        SHA256 of the concatenated raw bitstrings.
+  \item \texttt{"analysis\_code\_hash"}:
+        SHA256 of the analysis script.
+  \item \texttt{"provenance"}:
+        free-form metadata (device, date, operator, tags).
+\end{itemize}
+
+As with U58, the entire JSON payload is hashed again to produce a
+\emph{card hash}, which is the primary handle for publication and
+external verification.
+
+\section{Protocol outline}
+
+A minimal Unit R run proceeds as follows.
+
+\begin{enumerate}
+  \item \textbf{Sampling.}
+        Collect $N$ bitstrings of length $n$ from the source.
+        Store them in a raw file (e.g.\ newline-separated hex or binary).
+  \item \textbf{Empirical distribution.}
+        Compute $\hat p(x)$, $H(\hat p)$, and $H_{\min}(\hat p)$.
+  \item \textbf{Deviation bounds.}
+        For chosen $\delta$, compute $\epsilon_N$ and $\eta_N$
+        as above, then $\varepsilon_H$ and $\varepsilon_{\min}$.
+  \item \textbf{Verdict.}
+        If $H(\hat p) - \varepsilon_H$ and $H_{\min}(\hat p) - \varepsilon_{\min}$
+        exceed configured thresholds, mark the card as ``pass''.
+        Otherwise, ``fail'' (insufficient randomness).
+  \item \textbf{Card construction.}
+        Assemble the JSON payload with all fields and hashes.
+  \item \textbf{Publication / attestation.}
+        Optionally sign the card and/or upload it to an external registry.
+\end{enumerate}
+
+Unit R does not prescribe any particular \emph{source}:
+it can be a quantum device, a classical TRNG, or even a pseudo--random
+generator under test.
+The certificate only speaks about the observed distribution.
+
+\section{Relation to existing NVADE units}
+
+Unit R builds on the same finite--sample philosophy as the core NVADE
+entropy units:
+
+\begin{itemize}
+  \item It reuses the machinery for computing $H(\hat p)$,
+        $H_{\min}(\hat p)$, and statistical error bars.
+  \item Instead of starting from a structured amplitude vector
+        $\psi$, it starts directly from classical bitstrings.
+  \item The output card format mirrors U58 (attestation) so that
+        randomness sources can be audited alongside NVADE--encoded
+        quantum experiments.
+\end{itemize}
+
+Future extensions may add:
+joint tests in multiple bases, device--independent randomness expansion,
+and integration with the NVADE noise--window advantage metrics.
+
+\end{document}
