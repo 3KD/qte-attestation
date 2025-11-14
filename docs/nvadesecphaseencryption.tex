@@ -3,7 +3,7 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 
-\title{NVADE--SEC Phase Encryption with Normalized Vector Amplitude Keys}
+\title{A NVADE--SEC Phase-Mask Primitive with $n$-Bit Amplitude Information Limit}
 \author{Erik Dollarhide}
 \date{\today}
 
@@ -11,7 +11,7 @@
 \maketitle
 
 \begin{abstract}
-We define a simple Hilbert-space encryption primitive built on Normalized Vector Amplitude Distribution Encoding (NVADE). A NVADE key is any $n$-qubit pure state obtained by applying NVADE to a convergent complex series or other structured object. We specify a family of message-dependent diagonal unitaries that modulate the phases of the key, derive an $n$-bit amplitude information limit for this construction, and report an initial correctness experiment showing unit-fidelity decryption for a six-qubit, six-bit instance implemented in the \texttt{qte-attestation} codebase.
+We define a simple Hilbert-space phase-mask primitive built on Normalized Vector Amplitude Distribution Encoding (NVADE). A NVADE key is any $n$-qubit pure state obtained by applying NVADE to a convergent complex series or other structured object. We specify a family of message-dependent diagonal unitaries that modulate the phases of the key, derive an $n$-bit amplitude information limit for this construction (at most $n$ bits of classical message per $n$-qubit NVADE key), and report an initial correctness experiment showing unit-fidelity decryption for a six-qubit, six-bit instance implemented in the \texttt{qte-attestation} codebase. We explicitly treat this as a phase-mask \emph{primitive}---not a full IND-CPA-secure encryption scheme---and leave full security analysis to future work.
 \end{abstract}
 
 \section{NVADE keys}
@@ -35,18 +35,18 @@ define an $n$-qubit pure state
 \]
 which we call a \emph{NVADE key state}. In the implementation used for the experiment below we take $f$ to be a truncated series for $\pi$, but the construction is agnostic to the choice of $f$: any NVADE embedding that produces a normalized statevector can serve as the key.
 
-\section{Phase encryption scheme}
+\section{Phase-mask primitive}
 
 Fix $n$ qubits and identify the computational basis with $\{0,1\}^n$. For any message bitstring $m \in \{0,1\}^m$ with $m \le n$, define a diagonal unitary
 \[
   U_m = \mathrm{diag}\big( (-1)^{\langle x, m \rangle} \big)_{x \in \{0,1\}^n},
 \]
-where $\langle x, m \rangle$ is the bitwise inner product modulo two. Encryption of message $m$ with NVADE key state $\lvert \psi_{\mathrm{key}} \rangle$ is
+where $\langle x, m \rangle$ is the bitwise inner product modulo two. Given a NVADE key state $\lvert \psi_{\mathrm{key}} \rangle$, the associated \emph{cipherstate} for message $m$ is
 \[
   \lvert \psi_{\mathrm{enc}}(m) \rangle
   = U_m \lvert \psi_{\mathrm{key}} \rangle.
 \]
-Decryption applies the same unitary again:
+Applying the same unitary again yields
 \[
   \lvert \psi_{\mathrm{dec}}(m) \rangle
   = U_m \lvert \psi_{\mathrm{enc}}(m) \rangle
@@ -55,7 +55,7 @@ Decryption applies the same unitary again:
 \]
 since each phase factor squares to $+1$. In circuit form, $U_m$ can be realized as a product of $Z$-type phase gates controlled by the message bits.
 
-This construction is what we refer to as the NVADE--SEC phase encryption primitive (E1--T2): keys are structured NVADE embeddings, while messages act as phase masks on those amplitude keys.
+This construction is what we refer to as the NVADE--SEC phase-mask primitive (E1--T2): keys are structured NVADE embeddings, while messages act as phase masks on those amplitude keys. In this note we focus on \emph{correctness} and \emph{capacity} of this primitive, and do not claim full semantic security.
 
 \section{Amplitude information limit}
 
@@ -69,6 +69,20 @@ is linear over $\mathbb{F}_2^n$. The set of distinct unitaries $\{U_m\}$ therefo
 \]
 In other words, although the underlying Hilbert space has exponential dimension $2^n$, this particular NVADE--SEC primitive explores an $n$-bit family of diagonal unitaries acting on a fixed NVADE key state. We refer to this $n$-bit bound as the \emph{amplitude information limit} of the scheme.
 
+We emphasize that this is a capacity statement for the specific family of diagonal masks $\{U_m\}$ used here, not for arbitrary unitaries on the $n$-qubit Hilbert space.
+
+\section{Threat model and limitations}
+
+We treat the construction above as a \emph{single-use phase-mask primitive} rather than a complete, multi-use encryption scheme.
+
+\begin{itemize}
+  \item \textbf{Correctness focus.} In this note we prove and test only \emph{correctness}: for any fixed NVADE key and message $m$, applying $U_m$ twice recovers the original key state with unit fidelity in the ideal (noiseless) model.
+  \item \textbf{Amplitude profile not secret.} The amplitude profile $\{|\psi_x|^2\}$ of the NVADE key is invariant under $U_m$ and may be treated as public; messages are encoded solely in phases. Any computational-basis measurement of a single cipherstate is independent of $m$.
+  \item \textbf{Single-use per key state.} Because different messages correspond to different diagonal masks acting on the \emph{same} key state, multiple uses with different masks may leak structured information about mask differences (e.g.\ via interference or swap-type tests). In this preliminary note we therefore restrict attention to a \emph{single logical use} of the primitive per prepared key state and leave quantitative analysis of key reuse to future work.
+  \item \textbf{No full security definition.} We do not formalize an IND-CPA-style adversarial game or prove semantic security; doing so would require a more detailed treatment of the adversary's access to copies of the key state and to multiple ciphertexts. Here we use the word ``primitive'' rather than ``encryption scheme'' to reflect this limitation.
+  \item \textbf{No noise analysis.} All experiments reported below are performed in the ideal statevector model. Hardware and noise robustness studies are left to separate work within the broader NVADE--SEC programme.
+\end{itemize}
+
 \section{Implementation and experiment}
 
 We implemented this primitive in the \texttt{qte-attestation} repository as test E1--T2. A NVADE key state with $n = 6$ qubits is constructed from a truncated series for $\pi$ and stored as a normalized statevector. For each trial we:
@@ -78,9 +92,9 @@ We implemented this primitive in the \texttt{qte-attestation} repository as test
   \item apply $U_m$ again to obtain $\lvert \psi_{\mathrm{dec}}(m) \rangle$,
   \item compute the fidelity
     \[
-      F(m) = \bigl\lvert
+      F(m) = \left\lvert
       \langle \psi_{\mathrm{key}} \mid \psi_{\mathrm{dec}}(m) \rangle
-      \bigr\rvert^2.
+      \right\rvert^2.
     \]
 \end{enumerate}
 
@@ -94,16 +108,18 @@ the summary statistics recorded in
   \texttt{average\_fidelity} &\approx 1.0000000000000002,\\
   \texttt{min\_fidelity} &\approx 1.0000000000000004,
 \end{align*}
-up to floating-point rounding. In all sampled trials the recovered state is numerically identical to the original NVADE key state, confirming correctness of the implemented encryption and decryption unitaries for all tested messages.
+up to floating-point rounding. In all sampled trials the recovered state is numerically identical to the original NVADE key state, confirming correctness of the implemented phase-mask unitaries for all tested messages in the noiseless model.
 
-\section{Outlook}
+\section{Relation to prior work and outlook}
 
-This note isolates a minimal NVADE--SEC encryption primitive:
+Diagonal phase masks and fixed reference states have appeared previously in the context of quantum stream ciphers and data-locking constructions; our goal here is not to introduce diagonal masks per se. The novelty of this note is to show that NVADE key states---structured embeddings of mathematical objects into Hilbert space---support a simple, reproducible phase-mask primitive with a clean $n$-bit amplitude information limit and a concrete implementation in an open-source codebase.
+
+This isolates a minimal NVADE--SEC building block:
 \begin{itemize}
   \item keys are structured NVADE embeddings of mathematical objects into Hilbert space;
   \item messages modulate key phases via a family of diagonal unitaries $U_m$;
   \item the amplitude information limit for this primitive is $n$ bits on $n$ qubits;
   \item a reference implementation and reproducible numerical experiment are available in the public codebase.
 \end{itemize}
-Future work will combine this primitive with adversarial games, error-correcting structure, and handshake protocols, and integrate it into the broader NVADE--SEC attestation and noise-window programme.
+Future work will combine this primitive with explicit adversarial games, error-correcting structure, and handshake protocols, and integrate it into the broader NVADE--SEC attestation and noise-window programme.
 \end{document}
