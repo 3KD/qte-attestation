@@ -1,0 +1,184 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm}
+
+\title{E0 -- NVADE Key, Channel, and Threat Model}
+\author{QTE / NVADE--SEC}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Hilbert space and encoder family}
+
+For $n \in \mathbb{N}$, let $\mathcal{H}_n$ be the $n$--qubit Hilbert space
+\[
+  \mathcal{H}_n \coloneqq \mathrm{span}\{ \lvert x\rangle : x \in \{0,1\}^n \},
+\]
+with computational basis $\{ \lvert x\rangle \}_{x \in \{0,1\}^n}$.
+
+A \emph{NVADE encoder family} of $n$--qubit states is a map
+\[
+  F : \Theta \longrightarrow \mathbb{C}^{2^n}, \qquad
+  \theta \longmapsto \psi(\theta),
+\]
+together with metadata describing:
+\begin{itemize}
+  \item a series identifier $\mathrm{series\_id}$ (analytic family),
+  \item a truncation rule determining $n$ and the number of series coefficients,
+  \item a weighting scheme on coefficients,
+  \item an index order mapping term indices to basis elements $\lvert x\rangle$,
+  \item a normalization convention.
+\end{itemize}
+The normalized statevector associated to $\theta \in \Theta$ is
+\[
+  \lvert \psi(\theta)\rangle \coloneqq
+  \frac{\psi(\theta)}{\|\psi(\theta)\|_2} \in \mathcal{H}_n.
+\]
+
+\section*{Measurement distribution}
+
+Given $\theta \in \Theta$, the (ideal) measurement distribution in the computational basis is
+\[
+  p_\theta(x) \coloneqq \bigl|\langle x \mid \psi(\theta)\rangle\bigr|^2,
+  \qquad x \in \{0,1\}^n,
+\]
+which satisfies $\sum_{x} p_\theta(x) = 1$.
+
+\section*{Public family and secret key}
+
+\paragraph{Public NVADE family.}
+A \emph{public NVADE family} is the data
+\[
+  \mathsf{Family} \coloneqq
+  \bigl(
+    \mathrm{family\_id},\;
+    \mathrm{series\_id},\;
+    n,\;
+    \mathrm{max\_terms},\;
+    \mathrm{weighting\_scheme},\;
+    \mathrm{index\_order},\;
+    \mathrm{amp\_norm},\;
+    \mathrm{extra\_metadata}
+  \bigr),
+\]
+fixing a particular encoder family $F : \Theta \to \mathbb{C}^{2^n}$ and the basis ordering
+$x \mapsto \lvert x\rangle$.
+
+\paragraph{Secret key.}
+A \emph{secret NVADE key} is a choice of parameter
+\[
+  \theta \in \Theta
+\]
+for the fixed family $F$. In practice we treat $\theta$ as an opaque payload
+(e.g.\ hidden series parameters, seeds, branch choices) such that distinct keys yield
+typically distinct normalized states $\lvert \psi(\theta)\rangle$ up to global phase.
+
+We denote a secret key by the pair
+\[
+  \mathsf{Key} \coloneqq (\mathsf{Family}, \theta).
+\]
+
+\section*{Honest channel specification}
+
+The honest implementation of a NVADE key on a backend $B$ aims to realize samples from
+$p_\theta$ (possibly distorted by noise).
+
+\paragraph{Backends.}
+We distinguish two backend kinds:
+\begin{itemize}
+  \item $\mathsf{AER}$: a simulator backend (e.g.\ Qiskit Aer),
+  \item $\mathsf{IBM}$: an IBM Cloud hardware or noisy-simulator backend
+        (e.g.\ a Qiskit Runtime backend such as \texttt{ibm\_torino}).
+\end{itemize}
+
+\paragraph{Channel spec.}
+An \emph{honest channel specification} for a fixed public family
+$\mathsf{Family}$ is a tuple
+\[
+  \mathsf{Chan} \coloneqq
+  \bigl(
+    \mathsf{Family},\;
+    \mathsf{backend\_kind} \in \{\mathsf{AER},\mathsf{IBM}\},\;
+    \mathsf{backend\_name},\;
+    n,\;
+    \mathsf{shots},\;
+    \mathsf{measurement\_basis},\;
+    \mathsf{noise\_tag},\;
+    \mathsf{extra\_config}
+  \bigr),
+\]
+subject to the consistency condition
+\[
+  n = \mathrm{truncation\_n}(\mathsf{Family}).
+\]
+
+Mathematically, the honest channel corresponds to a (possibly noisy) CPTP map
+\[
+  \Lambda : \mathcal{D}(\mathcal{H}_n) \longrightarrow \mathcal{D}(\mathcal{H}_n),
+\]
+where $\mathcal{D}(\mathcal{H}_n)$ denotes density operators on $\mathcal{H}_n$.
+Ideally, measurement outcomes are drawn from
+\[
+  p_\theta^\Lambda(x)
+  \coloneqq \operatorname{Tr}\!\bigl[\Lambda(\lvert \psi(\theta)\rangle\langle\psi(\theta)\rvert)
+                                   \lvert x\rangle\langle x\rvert\bigr],
+  \qquad x \in \{0,1\}^n.
+\]
+
+\section*{Adversary access and threat model E0}
+
+We describe the adversary at E0 purely in terms of their \emph{view}, without
+committing to a specific security game.
+
+\paragraph{Adversary access modes.}
+For a fixed public family $\mathsf{Family}$ and channel spec $\mathsf{Chan}$, we consider
+the following access modes:
+
+\begin{itemize}
+  \item $\mathsf{PUBLIC\_SPEC\_ONLY}$: adversary sees only $\mathsf{Family}$.
+  \item $\mathsf{PUBLIC\_SPEC\_AND\_SAMPLES}$: adversary sees $\mathsf{Family}$ and can
+        obtain (bounded) samples from $p_\theta^\Lambda$ by querying the channel.
+  \item $\mathsf{PUBLIC\_SPEC\_AND\_NOISY\_MODEL}$: adversary knows an explicit approximate
+        noise model $\Lambda_{\mathrm{approx}}$ and can simulate approximate
+        $p_\theta^{\Lambda_{\mathrm{approx}}}$.
+  \item $\mathsf{FULL\_CHANNEL\_TRANSCRIPT}$: adversary sees everything that a verifier
+        sees in an attestation protocol (full measurement transcripts, meta-data),
+        but does not learn $\theta$.
+\end{itemize}
+
+\paragraph{Threat model E0.}
+An \emph{E0 threat model} for NVADE--SEC is a tuple
+\[
+  \mathsf{Threat} \coloneqq
+  \bigl(
+    \mathsf{Family},\;
+    \mathsf{Chan},\;
+    \mathsf{Access},\;
+    \mathsf{notes}
+  \bigr),
+\]
+where $\mathsf{Access}$ is one of the modes above and \emph{notes} is a natural-language
+record of additional assumptions (e.g.\ bounds on the number of samples).
+
+\section*{NVADE key bundle}
+
+For downstream units (U31, U56, U58) we package the objects above into a single
+\emph{NVADE key bundle}
+\[
+  \mathsf{Bundle} \coloneqq
+  \bigl(
+    \mathsf{Family},\;
+    \mathsf{Key},\;
+    \mathsf{Chan},\;
+    \mathsf{Threat}
+  \bigr),
+\]
+where all components share the same public family and satisfy the consistency
+conditions described above.
+
+The E0 specification is purely classical: it fixes the mathematical object
+$\lvert \psi(\theta)\rangle$, the intended implementation $\Lambda$, and the
+adversary's observational capabilities. Concrete security experiments (e.g.\ trapdoor
+witnesses, noise-window advantage, attestation cards) are defined on top of this bundle
+in subsequent units.
+\end{document}
