@@ -1,0 +1,19 @@
+{
+  "adversary_correct": 631,
+  "adversary_success_rate": 0.1262,
+  "experiment": "E1-T1-encryption-baseline",
+  "honest_correct": 5000,
+  "honest_success_rate": 1.0,
+  "key": {
+    "family_id": "nvade_ramanujan_pi_n3",
+    "key_label": "e1_demo_key_01",
+    "series_id": "ramanujan_pi_1_over_pi"
+  },
+  "message_bits": 3,
+  "n_trials": 5000,
+  "seed": 424242,
+  "threat_model": {
+    "adversary_access": "public_spec_only",
+    "notes": "Adversary learns only the public family/channel; no key material."
+  }
+}
