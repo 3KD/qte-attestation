@@ -1,0 +1,174 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm}
+
+\title{E1 -- NVADE--SEC Encryption Game (Baseline T1)}
+\author{QTE / NVADE--SEC}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Preliminaries}
+
+Fix $m \in \mathbb{N}$ and the message space
+\[
+  \mathcal{M}_m \coloneqq \{0,1\}^m,
+\]
+equipped with the uniform distribution when sampling random messages.
+Let $\mathcal{K}_m \coloneqq \{0,1\}^m$ denote the key space for length-$m$
+bitstrings.
+
+We assume a NVADE key bundle
+\[
+  \mathsf{Bundle} \coloneqq
+  \bigl(
+    \mathsf{Family},\;
+    \mathsf{Key},\;
+    \mathsf{Chan},\;
+    \mathsf{Threat}
+  \bigr)
+\]
+as defined in E0. Here:
+\begin{itemize}
+  \item $\mathsf{Family}$ is the public NVADE encoder family
+        (family id, series id, truncation, weighting, index order, norm),
+  \item $\mathsf{Key}$ is a secret parameter choice $\theta$ together with a
+        public key label, internal to the bundle,
+  \item $\mathsf{Chan}$ specifies an honest backend/channel implementation,
+  \item $\mathsf{Threat}$ encodes the adversary's observational power.
+\end{itemize}
+
+For the E1 baseline we only use the $\mathsf{Family}$ and the \emph{key label}
+as a source of deterministic key material; no quantum hardware is involved.
+
+\section*{Key derivation from the NVADE bundle}
+
+Let $\mathrm{family\_id}$ and $\mathrm{key\_label}$ denote the public family
+identifier and key label from the bundle. We form the string
+\[
+  s \coloneqq \texttt{family\_id} \,\|\, \texttt{"|"} \,\|\, \texttt{key\_label}
+\]
+and interpret its UTF-8 bytes as a sequence of unsigned integers
+$(b_1,\dots,b_L)$. Define a 32-bit seed
+\[
+  \mathrm{seed} \coloneqq \Bigl( \sum_{i=1}^L b_i \Bigr) \bmod 2^{32}.
+\]
+
+This seed is then fed to a fixed pseudorandom generator (in implementation
+terms, a numpy RNG) to obtain an $m$-bit key
+\[
+  K \in \mathcal{K}_m,
+\]
+with $K$ a deterministic function of the bundle's public identifiers. For the
+E1--T1 baseline we regard this as an abstract deterministic key-derivation
+function
+\[
+  \mathrm{KDF} : \mathsf{Bundle}^{\mathrm{pub}} \times \{m\} \to \mathcal{K}_m.
+\]
+
+\section*{Encryption and decryption}
+
+Given $K \in \mathcal{K}_m$, encryption and decryption are defined by the
+XOR-based one-time-pad rules:
+\begin{align*}
+  \mathrm{Enc}_K : \mathcal{M}_m &\to \mathcal{C}_m, &
+  \mathrm{Enc}_K(M) &\coloneqq M \oplus K, \\
+  \mathrm{Dec}_K : \mathcal{C}_m &\to \mathcal{M}_m, &
+  \mathrm{Dec}_K(C) &\coloneqq C \oplus K,
+\end{align*}
+where $\mathcal{C}_m = \{0,1\}^m$ is the ciphertext space and $\oplus$ denotes
+bitwise XOR.
+
+For any fixed key $K$, this satisfies
+\[
+  \mathrm{Dec}_K(\mathrm{Enc}_K(M)) = M
+  \qquad\text{for all } M \in \mathcal{M}_m,
+\]
+so the honest decryptor can always recover the message in the absence of
+implementation errors.
+
+In the E1 baseline we treat the NVADE bundle as providing $K$ via the KDF
+described above, but do not otherwise use the quantum structure of the family.
+The goal is simply to anchor a concrete encryption game to the NVADE key
+bundle API.
+
+\section*{E1--T1 encryption game (keyed vs no-key adversary)}
+
+We now define the baseline test T1 for a fixed $m$ and fixed bundle.
+
+\subsection*{Experiment}
+
+Let $K \gets \mathrm{KDF}(\mathsf{Bundle}^{\mathrm{pub}}, m)$ be the derived
+key. In each trial we perform:
+\begin{enumerate}
+  \item Sample a message $M \gets \mathcal{M}_m$ uniformly at random.
+  \item Compute the ciphertext $C \coloneqq \mathrm{Enc}_K(M)$.
+  \item \emph{Honest decryptor:} output
+        $M_{\mathrm{hon}} \coloneqq \mathrm{Dec}_K(C)$.
+  \item \emph{No-key adversary:} output
+        $M_{\mathrm{adv}} \gets \mathcal{M}_m$ as a uniformly random guess,
+        independent of $C$.
+  \item Record the indicator variables
+        \[
+          S_{\mathrm{hon}} \coloneqq \mathbf{1}[M_{\mathrm{hon}} = M], \qquad
+          S_{\mathrm{adv}} \coloneqq \mathbf{1}[M_{\mathrm{adv}} = M].
+        \]
+\end{enumerate}
+
+Repeating this process for $N$ independent trials yields empirical success
+rates
+\[
+  \hat{p}_{\mathrm{hon}} \coloneqq
+    \frac{1}{N} \sum_{i=1}^N S_{\mathrm{hon}}^{(i)}, \qquad
+  \hat{p}_{\mathrm{adv}} \coloneqq
+    \frac{1}{N} \sum_{i=1}^N S_{\mathrm{adv}}^{(i)}.
+\]
+
+\subsection*{Theoretical baseline}
+
+By construction,
+\[
+  S_{\mathrm{hon}} = 1 \quad\text{almost surely,}
+\]
+so in the idealised model the honest decryptor's success probability is
+\[
+  p_{\mathrm{hon}} = 1.
+\]
+
+For the no-key adversary, each guess is independent of $M$ and uniformly
+distributed on $\mathcal{M}_m$, hence
+\[
+  p_{\mathrm{adv}} = \Pr[M_{\mathrm{adv}} = M]
+  = \frac{1}{2^m}.
+\]
+
+Thus the E1--T1 baseline experiment should empirically produce
+\[
+  \hat{p}_{\mathrm{hon}} \approx 1,
+  \qquad
+  \hat{p}_{\mathrm{adv}} \approx 2^{-m},
+\]
+up to sampling noise. This is the behaviour confirmed by the current QTE
+implementation for $m \in \{3,6,7,8\}$ with $N$ in the range $5\cdot 10^3$ to
+$10^4$.
+
+\section*{Role within NVADE--SEC}
+
+The E1--T1 game does not claim any novel cryptographic hardness; it is a
+deliberately simple construction that:
+
+\begin{itemize}
+  \item pins down a precise notion of ``encryption'' derived from a NVADE key
+        bundle, using only the existing E0 interface,
+  \item yields a clean, reproducible baseline gap between a keyed decryptor
+        and a no-key adversary, with success scaling as $2^{-m}$,
+  \item provides a concrete experimental object (E1) that can later be
+        tightened or replaced by more sophisticated games using the same bundle
+        abstraction and attestation machinery.
+\end{itemize}
+
+Subsequent tests (e.g.\ E1--T2) will depart from this idealised one-time-pad
+setting by exposing structured transcripts or partial information and asking
+whether an adversary can beat the $2^{-m}$ baseline, thereby probing more
+subtle properties of NVADE-based keys and their attestation.
+\end{document}
