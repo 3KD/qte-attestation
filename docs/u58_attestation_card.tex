@@ -1,0 +1,215 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm}
+
+\title{U58 -- NVADE--SEC Attestation Cards}
+\author{QTE / NVADE--SEC}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Preliminaries: NVADE key bundle (E0)}
+
+Fix $n \in \mathbb{N}$ and the $n$--qubit Hilbert space
+\[
+  \mathcal{H}_n \coloneqq \mathrm{span}\{ \lvert x\rangle : x \in \{0,1\}^n \},
+\]
+with computational basis $\{ \lvert x\rangle \}_{x \in \{0,1\}^n}$.
+
+A NVADE encoder family is a map
+\[
+  F : \Theta \longrightarrow \mathbb{C}^{2^n},
+  \qquad \theta \longmapsto \psi(\theta),
+\]
+together with public metadata (family id, series id, truncation rule, weighting
+scheme, index order, normalization convention). The normalized statevector is
+\[
+  \lvert \psi(\theta)\rangle
+  \coloneqq \frac{\psi(\theta)}{\|\psi(\theta)\|_2} \in \mathcal{H}_n,
+\]
+and the associated ideal measurement distribution in the computational basis is
+\[
+  p_\theta(x) \coloneqq \bigl|\langle x \mid \psi(\theta)\rangle\bigr|^2,
+  \qquad x \in \{0,1\}^n.
+\]
+
+Following E0, a \emph{NVADE key bundle} is a tuple
+\[
+  \mathsf{Bundle} \coloneqq
+  \bigl(
+    \mathsf{Family},\;
+    \mathsf{Key},\;
+    \mathsf{Chan},\;
+    \mathsf{Threat}
+  \bigr),
+\]
+where:
+\begin{itemize}
+  \item $\mathsf{Family}$ is the public NVADE family description,
+  \item $\mathsf{Key} = (\mathsf{Family}, \theta)$ is a secret choice of parameter
+        $\theta \in \Theta$ (typically yielding a distinct state up to global phase),
+  \item $\mathsf{Chan}$ specifies an honest implementation of $p_\theta$ (or a noisy
+        variant $p_\theta^\Lambda$) on a backend of kind $\mathsf{AER}$ or $\mathsf{IBM}$,
+  \item $\mathsf{Threat}$ is an E0 threat model specifying what the adversary can observe
+        (e.g.\ public spec only, public spec plus samples, full transcript).
+\end{itemize}
+We write $\mathsf{Bundle}^{\mathrm{pub}}$ for the \emph{public projection} of the bundle,
+which exposes only the public family, the channel spec, the adversary access mode and
+a key label, but not the internal representation of $\theta$.
+
+\section*{Attestation experiment}
+
+An \emph{attestation experiment} is a single execution of a fixed test
+(e.g.\ a trapdoor witness game) using a fixed NVADE key bundle.
+
+At a high level, one attestation experiment consists of:
+\begin{itemize}
+  \item a choice of unit and test identifier (e.g.\ unit U31, test T2),
+  \item a backend configuration (AER or specific IBM device, shot count, noise tag),
+  \item a witness construction that computes scores on honest vs.\ impostor data
+        and yields a ROC curve with summary metrics,
+  \item the resulting measurement data and derived statistics.
+\end{itemize}
+
+Formally, we collect the experiment metadata into the following components.
+
+\paragraph{Test descriptor.}
+A \emph{test descriptor} is a tuple
+\[
+  \mathsf{Test} \coloneqq
+  \bigl(
+    \mathrm{unit\_id},\;
+    \mathrm{test\_id},\;
+    \mathrm{version},\;
+    \mathrm{commit\_hash},\;
+    \mathrm{timestamp}
+  \bigr),
+\]
+where:
+\begin{itemize}
+  \item $\mathrm{unit\_id}$ is a symbolic identifier such as \(\text{``U31''}\),
+  \item $\mathrm{test\_id}$ refines the unit (e.g.\ \(\text{``T2-wrong-key-LLR''}\)),
+  \item $\mathrm{version}$ records a test/witness version string,
+  \item $\mathrm{commit\_hash}$ is an optional VCS commit hash of the code used,
+  \item $\mathrm{timestamp}$ is an ISO-8601 timestamp in UTC.
+\end{itemize}
+
+\paragraph{Measurement configuration.}
+A \emph{measurement configuration} is
+\[
+  \mathsf{Meas} \coloneqq
+  \bigl(
+    n,\;
+    \mathrm{shots},\;
+    \mathrm{basis},\;
+    \mathrm{noise\_tag}
+  \bigr),
+\]
+where $n$ is the number of qubits, \(\mathrm{shots}\) is the shot count used in the
+experiment, \(\mathrm{basis}\) is the measurement basis (typically ``computational''),
+and \(\mathrm{noise\_tag}\) is a high-level description of the noise regime
+(e.g.\ ``ideal'', ``native'', ``mitigated'').
+
+\paragraph{Witness profile.}
+Given two labeled classes (e.g.\ honest vs.\ impostor), a \emph{witness} is a
+scoring function $S$ that maps each observed event to a real score. Sweeping a
+threshold $\tau$ yields a receiver-operating characteristic (ROC) curve
+\[
+  \bigl(\mathrm{FPR}(\tau),\,\mathrm{TPR}(\tau)\bigr)_{\tau},
+\]
+from which we extract summary metrics such as the area under the ROC curve (AUC)
+and the true positive rate at a fixed false positive rate (e.g.\ 1\%).
+
+We package the witness information into
+\[
+  \mathsf{Witness} \coloneqq
+  \bigl(
+    \mathrm{witness\_id},\;
+    \mathrm{params},\;
+    \mathrm{ROC},\;
+    \mathrm{metrics}
+  \bigr),
+\]
+where:
+\begin{itemize}
+  \item $\mathrm{witness\_id}$ names the witness family or implementation version,
+  \item $\mathrm{params}$ records any hyperparameters,
+  \item $\mathrm{ROC}$ optionally stores sampled points of the ROC curve
+        (false positive rates, true positive rates, thresholds),
+  \item $\mathrm{metrics}$ at minimum stores the AUC and TPR at 1\% FPR.
+\end{itemize}
+
+\paragraph{Provenance.}
+Finally, a \emph{provenance descriptor} is a tuple
+\[
+  \mathsf{Prov} \coloneqq
+  \bigl(
+    \mathrm{runs\_paths},\;
+    \mathrm{card\_hash},\;
+    \mathrm{notes}
+  \bigr),
+\]
+where $\mathrm{runs\_paths}$ is a list of underlying run-JSON paths (e.g.\
+\texttt{runs/u31\_t2\_wrong\_key\_ibm\_torino.json}), $\mathrm{card\_hash}$ is a
+cryptographic hash of the attestation card itself (defined below), and
+$\mathrm{notes}$ is free-form context.
+
+\section*{Attestation card and canonical hash}
+
+A \emph{U58 attestation card} for one experiment is the tuple
+\[
+  \mathsf{Card} \coloneqq
+  \bigl(
+    \mathsf{Bundle}^{\mathrm{pub}},\;
+    \mathsf{Test},\;
+    \mathsf{Meas},\;
+    \mathsf{Witness},\;
+    \mathsf{Prov}
+  \bigr),
+\]
+where $\mathsf{Bundle}^{\mathrm{pub}}$ is the public projection of the underlying
+NVADE key bundle:
+\begin{itemize}
+  \item the public family $\mathsf{Family}$ (family id, series id, truncation, etc.),
+  \item the channel spec $\mathsf{Chan}$ (backend kind, backend name, $n$, shots,
+        noise tag, extra configuration),
+  \item the E0 adversary access mode from $\mathsf{Threat}$,
+  \item a key label identifying the secret key without revealing $\theta$.
+\end{itemize}
+The internal parameter $\theta$ itself is not exposed on the card.
+
+In the implementation, attestation cards are represented as JSON objects. To make
+cards tamper-evident we define a \emph{canonical hash} as follows. Let
+\(\mathsf{Card}\) be represented as a JSON object, and let \(\mathsf{Card}'\) be
+the same object with the field \(\mathrm{card\_hash}\) set to \texttt{null}. Let
+\(\mathrm{JSON}(\mathsf{Card}')\) denote the canonical JSON string obtained by
+serializing with sorted keys and fixed separators. The attestation hash is
+\[
+  \mathrm{card\_hash}(\mathsf{Card})
+  \coloneqq \mathrm{SHA256}\bigl(\mathrm{JSON}(\mathsf{Card}')\bigr),
+\]
+where SHA-256 is the standard 256-bit secure hash function. The stored hash on
+the card must agree with this value for the card to be considered valid.
+
+\section*{Usage}
+
+In the current NVADE--SEC pipeline, U58 attestation cards are produced from
+U31-style run artifacts as follows:
+
+\begin{itemize}
+  \item A NVADE key bundle $\mathsf{Bundle}$ (E0) is fixed, specifying the family,
+        backend and threat model.
+  \item A U31 experiment is executed (e.g.\ trapdoor witness or wrong-key test),
+        producing a run JSON with backend identifiers, shot counts, ROC data and
+        summary metrics.
+  \item The run JSON and $\mathsf{Bundle}$ are combined into a single
+        $\mathsf{Card}$, filling the \(\mathsf{Test}\), \(\mathsf{Meas}\),
+        \(\mathsf{Witness}\) and \(\mathsf{Prov}\) components.
+  \item The canonical hash $\mathrm{card\_hash}(\mathsf{Card})$ is computed and
+        written back to the card.
+\end{itemize}
+
+These attestation cards serve as the canonical evidence objects for NVADE--SEC:
+they can be stored, signed, or published, and downstream analyses (including
+noise-window advantage studies) operate on families of such cards.
+\end{document}
