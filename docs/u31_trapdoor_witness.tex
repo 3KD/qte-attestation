@@ -1,0 +1,282 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
+\usepackage{hyperref}
+
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+
+\title{U31--T1 Trapdoor Witness ROC for NVADE--SEC Phase Encryption}
+\author{E.~Dollarhide}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Unit U31--T1 implements a concrete ``trapdoor witness'' test for NVADE--SEC
+phase encryption.
+Given a reference amplitude state $\bm{\psi} \in \mathbb{C}^{2^n}$ and an
+impostor state $\bm{\psi}^{(\mathrm{imp})}$ on the same $n$ qubits, we define
+a log--likelihood score for observed bitstrings with respect to the
+reference distribution $p(k) = |\psi_k|^2$ and measure how well these scores
+separate honest vs impostor experiments.
+The test runs both on Qiskit Aer and on an IBM Quantum backend
+(\texttt{ibm\_fez}), and reports ROC metrics
+(AUC, TPR at $1\%$ FPR) together with summary statistics.
+This unit is the first concrete implementation of the U31 trapdoor witness
+in the NVADE--SEC spine.
+\end{abstract}
+
+\section{Setup: reference and impostor states}
+
+Let $n \ge 1$ and $N = 2^n$.
+We fix a reference amplitude vector
+\[
+  \bm{\psi} = (\psi_0,\dots,\psi_{N-1}) \in \mathbb{C}^N,
+  \qquad
+  \|\bm{\psi}\|_2 = 1,
+\]
+prepared from a NVADE series embedding and stored on disk as
+\verb|states/u31_ref_psi.npy|.
+This defines an $n$--qubit pure state
+\[
+  |\psi\rangle = \sum_{k=0}^{N-1} \psi_k \, |k\rangle,
+  \qquad
+  p(k) = |\psi_k|^2.
+\]
+
+An impostor state $\bm{\psi}^{(\mathrm{imp})} \in \mathbb{C}^N$ is either
+\begin{itemize}
+  \item provided explicitly via a second \verb|.npy| file, or
+  \item generated synthetically by applying a random permutation and
+        random phases to $\bm{\psi}$:
+  \[
+    \psi^{(\mathrm{imp})}_k = \psi_{\pi(k)} e^{i\theta_k}, \quad
+    \theta_k \sim \mathrm{Unif}[0,2\pi).
+  \]
+\end{itemize}
+In U31--T1 we use the second option, so that the impostor ensemble
+approximates a ``wrong key'' state family derived from the same spectrum.
+
+\section{Score function and ROC statistic}
+
+\subsection{Log--likelihood scores}
+
+\begin{definition}[Log--likelihood score]
+Given a reference distribution $p(k) = |\psi_k|^2$ over
+$\{0,1\}^n$ and an observed bitstring $x \in \{0,1\}^n$,
+the U31--T1 score is
+\[
+  s(x) = \log\big(p(x) + \varepsilon\big),
+\]
+where $\varepsilon > 0$ is a small regulator (fixed to $\varepsilon = 10^{-15}$
+in the implementation) to avoid $\log 0$.
+\end{definition}
+
+For an experiment producing a multiset of bitstrings with empirical
+counts $\{c_x\}$, we expand this into a score sample
+\[
+  \mathcal{S}
+  = \{ s(x) : x \text{ observed, repeated } c_x \text{ times}\}.
+\]
+In U31--T1 we obtain:
+\begin{itemize}
+  \item an ``honest'' score set $\mathcal{S}_+$ from runs prepared with
+        the reference state $\bm{\psi}$, and
+  \item an ``impostor'' score set $\mathcal{S}_-$ from runs prepared with
+        $\bm{\psi}^{(\mathrm{imp})}$.
+\end{itemize}
+
+\subsection{ROC curve and AUC}
+
+Let $\{s_i^+\} \subset \mathcal{S}_+$ and $\{s_j^-\} \subset \mathcal{S}_-$
+denote the honest and impostor scores.
+We define labels $y = 1$ for honest and $y = 0$ for impostor, and sort the
+pooled scores $\{(s_\ell, y_\ell)\}$ in descending order of $s_\ell$.
+
+For any threshold $\tau \in \mathbb{R}$, the corresponding classifier
+\[
+  \hat{y}_\tau = \mathbf{1}\{ s \ge \tau \}
+\]
+yields a true positive rate and false positive rate
+\[
+  \mathrm{TPR}(\tau) = \frac{\#\{s_i^+ \ge \tau\}}{\#\mathcal{S}_+},
+  \qquad
+  \mathrm{FPR}(\tau) = \frac{\#\{s_j^- \ge \tau\}}{\#\mathcal{S}_-}.
+\]
+Sweeping $\tau$ from $+\infty$ to $-\infty$ traces out a ROC curve
+$(\mathrm{FPR}(\tau), \mathrm{TPR}(\tau))$.
+The area under this curve is estimated numerically by trapezoidal rule:
+\[
+  \mathrm{AUC}
+  \approx \sum_{i=1}^{L-1}
+  \big( \mathrm{FPR}_i - \mathrm{FPR}_{i-1} \big)
+  \frac{\mathrm{TPR}_i + \mathrm{TPR}_{i-1}}{2}.
+\]
+
+We also report the true positive rate at $1\%$ false positive rate,
+\[
+  \mathrm{TPR}_{1\%}
+  = \max\{ \mathrm{TPR}(\tau) : \mathrm{FPR}(\tau) \le 0.01\},
+\]
+as a more operational threshold for key-accept / key-reject decisions.
+
+\section{Implementation details}
+
+\subsection{Runner script}
+
+The U31--T1 harness is implemented in
+\verb|runner/u31_t1_trapdoor_witness.py|.
+Its main arguments are:
+\begin{itemize}
+  \item \verb|--ref-psi|: path to \verb|.npy| file with the reference
+        amplitude vector (complex dtype).
+  \item \verb|--alt-psi| (optional): path to impostor vector; if omitted,
+        a permuted / rephased version of \verb|ref-psi| is generated.
+  \item \verb|--backend|: \verb|aer| or \verb|ibm|.
+  \item \verb|--backend-name|: optional explicit backend name
+        (e.g.\ \verb|ibm_fez|).
+  \item \verb|--shots|: shots per class (honest and impostor).
+  \item \verb|--seed|: base RNG seed.
+  \item \verb|--send-ibm|: required guardrail flag when using
+        \verb|--backend ibm|.
+  \item \verb|--out|: output JSON path.
+\end{itemize}
+
+The script performs the following steps:
+\begin{enumerate}
+  \item Load \verb|ref-psi| (and \verb|alt-psi| if provided); otherwise,
+        construct $\bm{\psi}^{(\mathrm{imp})}$ by a random permutation
+        and random phases.
+  \item Build a probability map $p(k)$ from \verb|ref-psi|.
+  \item Construct an $n$--qubit circuit using \verb|QuantumCircuit.initialize|
+        to prepare the given amplitude vector, then measure all qubits
+        in the computational basis.
+  \item Choose a backend:
+        \begin{itemize}
+          \item \textbf{Aer}: \verb|qiskit-aer| simulator
+                (\verb|aer_simulator|).
+          \item \textbf{IBM}: a real device obtained from
+                \verb|QiskitRuntimeService()|, here pinned to
+                \verb|ibm_fez|.
+        \end{itemize}
+  \item Run honest and impostor circuits with the same number of shots,
+        obtaining counts dictionaries \verb|counts_ref| and
+        \verb|counts_alt|.
+  \item Convert counts into score samples using $\log p(k)$, then compute
+        ROC, AUC, and $\mathrm{TPR}_{1\%}$.
+  \item Save a JSON payload containing:
+        \begin{itemize}
+          \item backend kind and name,
+          \item shot count and seed,
+          \item ROC arrays and area,
+          \item $\mathrm{TPR}_{1\%}$,
+          \item summary statistics (mean and standard deviation) of honest
+                and impostor scores.
+        \end{itemize}
+\end{enumerate}
+
+The script also prints a human-readable summary to stdout, which is
+included below for the canonical runs.
+
+\subsection{Canonical Aer run}
+
+The canonical simulator run uses
+\begin{itemize}
+  \item \verb|backend = aer_simulator|,
+  \item \verb|n_qubits = 3|,
+  \item \verb|shots_per_class = 4096|,
+  \item \verb|seed = 424242|.
+\end{itemize}
+The command is:
+\begin{verbatim}
+python runner/u31_t1_trapdoor_witness.py \
+  --ref-psi states/u31_ref_psi.npy \
+  --backend aer \
+  --shots 4096 \
+  --seed 424242 \
+  --out runs/u31_t1_aer.json
+\end{verbatim}
+
+The observed summary was:
+\begin{verbatim}
+== U31-T1 trapdoor witness ==
+ file: runs/u31_t1_aer.json
+ backend_kind: aer
+ backend_name: aer_simulator
+ shots_per_class: 4096
+ n_qubits: 3
+ auc: 0.6783105731010437
+ tpr_at_1pct_fpr: 0.193603515625
+ scores_summary:
+  honest: count=4096, mean=-1.813526, std=0.679718
+  impostor: count=4096, mean=-2.362832, std=0.546601
+\end{verbatim}
+
+\subsection{Canonical IBM hardware run}
+
+The canonical hardware run uses
+\begin{itemize}
+  \item backend \verb|ibm_fez|,
+  \item \verb|n_qubits = 3|,
+  \item \verb|shots_per_class = 4096|,
+  \item \verb|seed = 424242|,
+  \item explicit opt-in via \verb|--send-ibm|.
+\end{itemize}
+The command is:
+\begin{verbatim}
+python runner/u31_t1_trapdoor_witness.py \
+  --ref-psi states/u31_ref_psi.npy \
+  --backend ibm \
+  --backend-name ibm_fez \
+  --shots 4096 \
+  --seed 424242 \
+  --send-ibm \
+  --out runs/u31_t1_ibm_keyed.json
+\end{verbatim}
+
+The observed summary was:
+\begin{verbatim}
+== U31-T1 trapdoor witness ==
+ file: runs/u31_t1_ibm_keyed.json
+ backend_kind: ibm
+ backend_name: ibm_fez
+ shots_per_class: 4096
+ n_qubits: 3
+ auc: 0.6823735237121582
+ tpr_at_1pct_fpr: 0.215087890625
+ scores_summary:
+  honest: count=4096, mean=-1.812453, std=0.670984
+  impostor: count=4096, mean=-2.345398, std=0.574837
+\end{verbatim}
+
+Both runs show an AUC significantly above $0.5$ (random guessing) and a
+nontrivial $\mathrm{TPR}_{1\%}$, demonstrating that the log--likelihood
+scores derived from the NVADE amplitude distribution $p(k)$ contain a
+usable trapdoor signal: honest data are statistically distinguishable
+from impostor data with a simple scalar test.
+
+\section{Placement in the NVADE--SEC spine}
+
+Unit U31--T1 sits in the NVADE--SEC spine as follows:
+\begin{itemize}
+  \item Upstream, R1 provides a finite-sample entropy/min-entropy
+        certificate for classical bitstreams, and U58 specifies the
+        overall attestation card.
+  \item E0/E1 formalize the NVADE--SEC key/channel model and
+        information limit (at most $n$ bits per $n$-qubit use).
+  \item U31--T1 instantiates a concrete trapdoor witness:
+        given a reference amplitude state and a candidate impostor
+        state on the same qubits, a single experiment yields ROC
+        metrics quantifying how strongly the data support the
+        ``correct key'' hypothesis.
+  \item Future unit U31--T2 will replace the synthetic impostor with
+        a structured wrong-key family and log-likelihood ratio tests
+        over that key ensemble, but U31--T1 already provides a
+        working, hardware-validated witness for the trapdoor signal.
+\end{itemize}
+
+\end{document}
