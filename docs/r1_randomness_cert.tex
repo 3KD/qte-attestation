@@ -1,0 +1,152 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+
+\begin{document}
+
+\title{R1 -- Finite-Sample Randomness Certificate}
+\author{NVADE--SEC}
+\date{}
+\maketitle
+
+\section*{Informal goal}
+
+Given a finite sample of $N$ independent draws of $n$-bit strings
+\[
+X_1,\dots,X_N \in \{0,1\}^n,
+\]
+produce a machine-checkable certificate that lower-bounds:
+
+\begin{itemize}
+  \item the Shannon entropy $H(X)$, and
+  \item the min-entropy $H_{\min}(X)$
+\end{itemize}
+
+of the \emph{underlying source} with confidence at least $1-\delta$,
+for a user-chosen failure probability $0 < \delta < 1$.
+
+The certificate is a JSON object containing the empirical statistics
+and rigorously derived lower bounds, plus cryptographic hashes of the
+raw data and analysis code.
+
+\section*{Setup}
+
+We observe $N$ samples of an unknown distribution $P$ on $\{0,1\}^n$.
+Let $\mathcal{X} = \{0,1\}^n$ and $K = |\mathcal{X}| = 2^n$.
+
+For each $x \in \mathcal{X}$, define the count
+\[
+c(x) = \bigl|\{ i : X_i = x \}\bigr|,\qquad
+\hat p(x) = \frac{c(x)}{N}.
+\]
+The empirical Shannon entropy and empirical min-entropy are
+\[
+H(\hat p) = - \sum_{x \in \mathcal{X}} \hat p(x)\,\log_2 \hat p(x),
+\qquad
+H_{\min}(\hat p) = - \log_2 \max_{x \in \mathcal{X}} \hat p(x).
+\]
+
+The true (unknown) quantities are
+\[
+H(P) = - \sum_{x} P(x)\,\log_2 P(x),
+\qquad
+H_{\min}(P) = - \log_2 \max_x P(x).
+\]
+
+\section*{Certified min-entropy bound}
+
+Let $x^\star$ be any maximiser of $\hat p(x)$, so that
+\[
+\hat p_{\max} = \hat p(x^\star) = \frac{c_{\max}}{N}, \quad
+c_{\max} = \max_{x} c(x).
+\]
+We construct a one-sided confidence interval for the Bernoulli parameter
+$p^\star = P(x^\star)$ using a standard Clopper--Pearson-style bound.
+For user-specified $\delta \in (0,1)$, define $p_{\max}^{\mathrm{low}}$
+as the smallest $p$ such that
+\[
+\Pr\bigl( \mathrm{Bin}(N,p) \ge c_{\max} \bigr) \ge 1-\delta,
+\]
+where the probability is with respect to a Binomial$(N,p)$ random
+variable.  This $p_{\max}^{\mathrm{low}}$ can be computed numerically.
+
+Then, with probability at least $1-\delta$ over the sampling procedure,
+we have
+\[
+\max_{x} P(x) \le p_{\max}^{\mathrm{low}}.
+\]
+Therefore the \emph{certified min-entropy lower bound} is
+\[
+H_{\min}^{\mathrm{low}}
+= -\log_2 p_{\max}^{\mathrm{low}},
+\]
+and the certificate guarantees
+\[
+H_{\min}(P) \;\ge\; H_{\min}^{\mathrm{low}}
+\quad\text{with probability at least } 1-\delta.
+\]
+
+In the current implementation, $p_{\max}^{\mathrm{low}}$ is computed
+by a monotone numerical search for the smallest $p$ whose Binomial tail
+probability exceeds $1-\delta$; the resulting bound is conservative by
+construction.
+
+\section*{Certified Shannon entropy bound}
+
+A fully rigorous finite-sample lower bound on Shannon entropy is more
+delicate.  In the current R1 unit we take a conservative approach:
+
+\begin{itemize}
+  \item We report the empirical Shannon entropy $H(\hat p)$.
+  \item We set
+  \[
+  H^{\mathrm{low}} \coloneqq H(\hat p),
+  \]
+  and record this as the Shannon entropy lower bound, with the
+  understanding that this is a \emph{point estimate} rather than a
+  formal $1-\delta$ confidence interval.
+\end{itemize}
+
+Future versions of R1 may replace this with a PAC-style bound (for
+example using concentration inequalities over the simplex); the JSON
+schema allows for this by keeping the fields explicitly labelled.
+
+\section*{JSON schema}
+
+A typical R1 randomness certificate JSON object has the following
+fields:
+
+\begin{itemize}
+  \item \verb|"unit"|: \verb|"R1_randomness_cert"| \\
+  \item \verb|"n_bits"|: integer $n$ \\
+  \item \verb|"n_samples"|: integer $N$ \\
+  \item \verb|"delta"|: desired failure probability $\delta$ \\
+  \item \verb|"empirical_entropy"|: $H(\hat p)$ in bits \\
+  \item \verb|"entropy_lower_bound"|: $H^{\mathrm{low}}$ in bits \\
+  \item \verb|"empirical_min_entropy"|: $H_{\min}(\hat p)$ in bits \\
+  \item \verb|"min_entropy_lower_bound"|:
+        $H_{\min}^{\mathrm{low}}$ in bits \\
+  \item \verb|"raw_data_hash"|: SHA256 hex digest of the raw data file \\
+  \item \verb|"analysis_code_hash"|: SHA256 hex digest of the analysis
+        script used to produce the certificate.
+\end{itemize}
+
+\section*{Usage}
+
+\begin{enumerate}
+  \item Collect $N$ samples of $n$-bit outcomes from the source and
+        write them to a raw data file (e.g.\ one hexadecimal or binary
+        string per line).
+  \item Run the R1 analysis script to produce the JSON certificate.
+  \item Publish or archive both the raw data file and the JSON
+        certificate.  Any verifier can recompute the hashes and
+        empirical statistics to confirm the claim.
+\end{enumerate}
+
+This unit does not, by itself, ``prove'' that the source is truly
+random in the algorithmic sense; instead it provides a rigorous,
+finite-sample lower bound on the min-entropy of the underlying source
+under the i.i.d.\ sampling model.
+
+\end{document}

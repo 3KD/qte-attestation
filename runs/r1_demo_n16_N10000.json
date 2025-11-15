@@ -1,0 +1,22 @@
+{
+  "analysis_code_hash": "209a269f4398dd35f97f52ecc50635d20db13c24052b09a68a7c082f2b0f2c67",
+  "delta": 1e-06,
+  "empirical_entropy": 13.138296739541202,
+  "empirical_min_entropy": 11.287712379549449,
+  "entropy_lower_bound": 13.138296739541202,
+  "epsilon_H": 0.0,
+  "epsilon_Hmin": 6.498904946558052,
+  "epsilon_L1": 1.0,
+  "epsilon_infty": 0.03577639768582308,
+  "min_entropy_lower_bound": 4.788807432991397,
+  "n_bits": 16,
+  "n_samples": 10000,
+  "provenance": {
+    "bits_file": "data/r_t1_demo_bits_n16_N10000.txt",
+    "generated_by": "runner/r_t1_randomness_certificate.py",
+    "notes": "Demo R1 run on a raw bit file."
+  },
+  "raw_data_hash": "91672ba75d5206900ba712c69a3376f8675a79aebb1d700c8ffa1ef62506d981",
+  "unit": "R1_randomness_certificate",
+  "version": "0.1"
+}
