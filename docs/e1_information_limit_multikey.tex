@@ -1,0 +1,352 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
+\usepackage{hyperref}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+
+\title{NVADE--SEC Information Limit and Multi--Key Modulation Channels}
+\author{E.~Dollarhide}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Normalized Vector Amplitude Distribution Encoding (NVADE) maps a structured
+classical object---typically a truncated series---into a normalized state
+vector $\bm{\psi} \in \mathbb{C}^N$.
+In NVADE--SEC this state is then prepared on $n$ physical qubits
+($N = 2^n$) and used as the substrate for encryption, attestation, and
+randomness certification.
+This note formalizes the information-theoretic limit of such channels
+and extends the model to a general multi--key modulation scheme:
+an $n$--qubit ciphertext obtained by composing several key-controlled
+unitaries.
+We prove that, per channel use, an $n$--qubit NVADE state can carry at
+most $n$ bits of accessible classical information, regardless of the
+number or complexity of modulation keys, and we place the existing
+single-key NVADE phase encryption and the proposed multi--key scheme
+inside this unified framework.
+\end{abstract}
+
+\section{NVADE--based communication model}
+
+\subsection{NVADE state preparation}
+
+Let $t \in \mathbb{C}^L$ denote a finite complex sequence obtained from
+a mathematical object (e.g.\ truncated series coefficients).
+The NVADE map produces a normalized vector
+$\bm{\psi} \in \mathbb{C}^N$ as follows:
+\begin{enumerate}
+  \item Choose an embedding dimension $N = 2^n \ge L$.
+  \item Form $w \in \mathbb{C}^N$ by padding or truncating $t$ to length $N$.
+  \item Normalize:
+  \[
+    \bm{\psi} = \frac{w}{\|w\|_2}, \qquad
+    \|w\|_2 = \Big( \sum_{k=0}^{N-1} |w_k|^2 \Big)^{1/2}.
+  \]
+\end{enumerate}
+The pair $(t, N)$, together with a fixed ordering convention, uniquely
+determines $\bm{\psi}$ up to a global phase.
+
+On hardware, $\bm{\psi}$ is prepared as a pure $n$--qubit state
+\[
+  |\psi\rangle = \sum_{k=0}^{N-1} \psi_k\, |k\rangle
+  \in (\mathbb{C}^2)^{\otimes n},
+  \quad N = 2^n.
+\]
+We denote the corresponding density operator by
+$\rho = |\psi\rangle\!\langle \psi|$.
+
+\subsection{NVADE--SEC channel abstraction}
+
+A generic NVADE--SEC channel can be described as follows.
+Let $M$ be a classical message random variable taking values
+$m \in \{0,1\}^m$, and let $K$ be a (possibly structured) classical key
+taking values in a key space $\mathcal{K}$.
+For each $(m, K)$ the protocol specifies:
+\begin{enumerate}
+  \item A NVADE state $|\psi_0(m,K)\rangle$ prepared on $n$ qubits.
+  \item A (possibly key-dependent) quantum channel
+        $\mathcal{E}_K : \mathcal{D}((\mathbb{C}^2)^{\otimes n})
+        \to \mathcal{D}((\mathbb{C}^2)^{\otimes n})$.
+\end{enumerate}
+The transmitted ciphertext state is
+\[
+  \rho_{m,K}
+  = \mathcal{E}_K\!\big(|\psi_0(m,K)\rangle\!\langle \psi_0(m,K)|\big)
+  \in \mathcal{D}((\mathbb{C}^2)^{\otimes n}),
+\]
+where $\mathcal{D}(\mathcal{H})$ denotes the set of density operators
+on the Hilbert space $\mathcal{H}$.
+
+A receiver with full key knowledge has access to a decoding map
+$\mathcal{D}_K$ and a measurement $\{M_x\}$ on $n$ qubits, producing
+classical outcomes $X$ from which an estimate $\hat{M}$
+of the message is recovered.
+
+\section{Information limit for NVADE--SEC channels}
+
+We now make precise the information-theoretic limitation that an $n$--qubit
+NVADE--SEC channel cannot deliver more than $n$ bits of classical
+information per use, regardless of the structure of the key or the
+complexity of the modulation.
+
+\subsection{Ensemble and accessible information}
+
+Fix a joint distribution $p(m,k)$ over $(M,K)$.
+The \emph{average} ciphertext state is
+\[
+  \bar{\rho} = \sum_{m,k} p(m,k) \,\rho_{m,k}.
+\]
+Conditioned on a particular key value $K=k$, the message ensemble is
+$\{p(m|k), \rho_{m,k}\}_m$.
+
+Let $\{M_x\}$ be a POVM on $(\mathbb{C}^2)^{\otimes n}$.
+Given outcome $X=x$, the observer obtains information about $M$.
+The maximal mutual information between $M$ and $X$ achievable by varying
+$\{M_x\}$ is the \emph{accessible information} $I_{\text{acc}}(M:X)$.
+
+By the Holevo bound,
+\[
+  I_{\text{acc}}(M:X) \le \chi(M)
+  := S(\bar{\rho}) - \sum_m p(m) S(\rho_m),
+\]
+where $S(\rho) = -\mathrm{Tr}(\rho \log_2 \rho)$ is the von Neumann entropy,
+and $\rho_m = \sum_k p(k|m) \rho_{m,k}$ is the ciphertext state averaged
+over keys conditioned on $M=m$.
+
+\subsection{Information limit per use}
+
+We now specialize to the $n$--qubit setting.
+
+\begin{theorem}[NVADE information limit]
+\label{thm:info-limit}
+Let $\mathcal{H} = (\mathbb{C}^2)^{\otimes n}$.
+Consider any NVADE--SEC channel that, per use, produces ciphertext
+states $\rho_m \in \mathcal{D}(\mathcal{H})$ from messages
+$m \in \{0,1\}^m$ (possibly via key-dependent maps as above).
+Then for any choice of message distribution $p(m)$
+and any measurement $\{M_x\}$ on $\mathcal{H}$, the accessible
+information satisfies
+\[
+  I_{\text{acc}}(M:X) \le n.
+\]
+In particular, the classical capacity per use of the channel is at most
+$n$ bits.
+\end{theorem}
+
+\begin{proof}
+For fixed $p(m)$, the Holevo information
+$\chi(M) = S(\bar{\rho}) - \sum_m p(m) S(\rho_m)$ satisfies
+\[
+  \chi(M) \le S(\bar{\rho}) \le \log_2 \dim \mathcal{H}
+  = \log_2 (2^n) = n.
+\]
+The first inequality uses $S(\rho_m)\ge 0$ for all $m$; the second uses
+the standard upper bound $S(\rho) \le \log_2 d$ for any state on a
+$d$--dimensional Hilbert space.
+By the Holevo bound $I_{\text{acc}}(M:X) \le \chi(M)$, so
+$I_{\text{acc}}(M:X) \le n$ for any measurement $\{M_x\}$.
+
+Taking the supremum over all message distributions $p(m)$ and all
+measurements yields that the classical capacity per channel use is
+upper-bounded by $n$ bits.
+\end{proof}
+
+\begin{corollary}[Keys do not increase per-use capacity]
+\label{cor:keys-no-extra-bits}
+In the setting of Theorem~\ref{thm:info-limit}, allow arbitrary
+classical keys $K$ and arbitrary key-dependent channels
+$\mathcal{E}_K$ and decoders $\mathcal{D}_K$.
+Even if $K$ is chosen from an arbitrarily large key space and jointly
+distributed with $M$, the mutual information between $M$ and any
+measurement outcome on the $n$--qubit ciphertext, conditioned on $K$,
+is still bounded by $n$:
+\[
+  I_{\text{acc}}(M:X \mid K) \le n.
+\]
+Thus additional keys cannot increase the per-use payload beyond $n$ bits;
+they affect only security, not capacity.
+\end{corollary}
+
+\begin{proof}
+Fix $K=k$.
+Conditioned on $K=k$, we obtain an ensemble
+$\{p(m|k), \rho_{m,k}\}_m$ of states on $\mathcal{H}$.
+Applying Theorem~\ref{thm:info-limit} to this ensemble yields
+$I_{\text{acc}}(M:X \mid K=k) \le n$.
+Taking the expectation over $K$ preserves the upper bound.
+\end{proof}
+
+\section{Multi--key modulation channels}
+
+We now introduce the multi--key structure used by NVADE--SEC for
+encryption and key splitting.
+
+\subsection{Key modulators}
+
+Let $\mathcal{H} = (\mathbb{C}^2)^{\otimes n}$ as before.
+Let $K_1,\dots,K_k$ be classical keys, with values in key spaces
+$\mathcal{K}_1,\dots,\mathcal{K}_k$.
+For each $i$ and each $K_i \in \mathcal{K}_i$, let
+\[
+  M_i(K_i) : \mathcal{H} \to \mathcal{H}
+\]
+be a unitary operator (typically diagonal or structured in the NVADE
+basis).
+We call $M_i(K_i)$ a \emph{key modulator}.
+
+Given a base preparation $|\psi_0(m)\rangle$ for message $m$, the
+multi--key modulation channel applies the composite unitary
+\[
+  U_K := M_k(K_k) \cdots M_2(K_2) M_1(K_1),
+  \qquad K = (K_1,\dots,K_k),
+\]
+to produce the ciphertext
+\[
+  |\psi_{\text{ct}}(m,K)\rangle = U_K |\psi_0(m)\rangle,
+  \qquad
+  \rho_{m,K} = |\psi_{\text{ct}}(m,K)\rangle\!\langle \psi_{\text{ct}}(m,K)|.
+\]
+
+A legitimate receiver with access to all keys $K_1,\dots,K_k$ can
+invert $U_K$ by applying $U_K^\dagger$ followed by a decoding
+measurement tailored to $|\psi_0(m)\rangle$.
+
+\subsection{Information limit in the multi--key setting}
+
+The multi--key modulation channel is a special case of the general
+NVADE--SEC channel described above, with
+\[
+  \mathcal{E}_K(\rho) = U_K\, \rho\, U_K^\dagger.
+\]
+Thus Theorem~\ref{thm:info-limit} and
+Corollary~\ref{cor:keys-no-extra-bits} apply directly.
+
+\begin{proposition}[Multi--key information limit]
+\label{prop:multikey-limit}
+Consider the multi--key modulation channel defined above on $n$ qubits.
+For any number of keys $k \ge 1$, any choice of message distribution
+$p(m)$, key distribution $p(K)$, and any measurement $\{M_x\}$ on
+$\mathcal{H}$, the accessible information per use satisfies
+\[
+  I_{\text{acc}}(M:X \mid K) \le n.
+\]
+\end{proposition}
+
+\begin{proof}
+Immediate from Corollary~\ref{cor:keys-no-extra-bits}, observing that
+$\mathcal{E}_K$ is unitary and acts on $\mathcal{H}=(\mathbb{C}^2)^{\otimes n}$.
+\end{proof}
+
+In particular, multi--key modulation cannot increase the per-use payload
+beyond $n$ bits; it can only redistribute how those bits are encoded
+(e.g.\ among multiple logical fields) and how hard they are to recover
+without the full key set.
+
+\section{Security notions for missing-key adversaries}
+
+The role of additional keys is to degrade an adversary's ability to
+distinguish messages when some subset of keys is unknown.
+
+\subsection{IND--style experiment}
+
+We sketch a standard indistinguishability game tailored to the
+multi--key setting.
+
+\medskip
+\noindent
+\textbf{Game: IND--multikey.}
+\begin{enumerate}
+  \item The adversary $\mathcal{A}$ outputs two messages
+        $(m_0,m_1) \in \{0,1\}^m\times\{0,1\}^m$.
+  \item The challenger samples a key tuple
+        $K = (K_1,\dots,K_k) \sim P_K$ and a secret bit $b\in\{0,1\}$.
+  \item The challenger prepares the ciphertext state
+        $\rho_{m_b,K}$ and returns it to $\mathcal{A}$.
+        Optionally, $\mathcal{A}$ may be given some subset $S\subset\{1,\dots,k\}$
+        of the key components (e.g.\ $K_i$ for $i\in S$) and promised
+        that at least one key is missing ($S \neq \{1,\dots,k\}$).
+  \item The adversary performs a measurement on the received state
+        (and any known keys) and outputs a guess $b'$.
+\end{enumerate}
+The \emph{advantage} of $\mathcal{A}$ is
+\[
+  \mathrm{Adv}_{\text{IND}}(\mathcal{A})
+  = \big| \Pr[b' = b] - \tfrac{1}{2} \big|.
+\]
+
+We say the multi--key scheme is \emph{IND--secure against missing-key
+adversaries} if, for all efficient $\mathcal{A}$ having access to any
+proper subset of the keys, $\mathrm{Adv}_{\text{IND}}(\mathcal{A})$ is
+negligible in a chosen security parameter.
+
+\subsection{Design goal}
+
+From the perspective of NVADE--SEC, the design goal is:
+
+\medskip
+\noindent
+\textbf{Goal.}
+Choose the families of modulators $M_i(K_i)$ such that:
+\begin{enumerate}
+  \item For a legitimate receiver with all keys
+        $K_1,\dots,K_k$, the decoding map recovers up to $n$ bits of
+        message with high fidelity per use; and
+  \item For any adversary missing at least one key, the ensemble of
+        ciphertext states $\{\rho_{m,K} : m\in\{0,1\}^m\}$ is
+        (information-theoretically or computationally) close to a
+        key-independent reference ensemble (e.g.\ a maximally mixed or
+        high-entropy distribution), so that
+        $\mathrm{Adv}_{\text{IND}}(\mathcal{A})$ is provably small.
+\end{enumerate}
+
+In this formulation, additional keys do not change the upper bound
+$n$ on the per-use payload; they increase the difficulty of the
+distinguishing problem for adversaries lacking some portion of the key
+tuple $K$.
+
+\section{Placement in the NVADE--SEC spine}
+
+The results above provide the theoretical backbone for the encryption
+units in the NVADE--SEC spine.  In particular:
+\begin{itemize}
+  \item \textbf{E0 (Key \& channel spec).} Formalizes the NVADE
+        key bundle and channel description, including the mapping
+        from classical series metadata to $n$--qubit NVADE states.
+  \item \textbf{E1 (Information limit).}
+        Theorem~\ref{thm:info-limit} and
+        Proposition~\ref{prop:multikey-limit} establish that any
+        NVADE--SEC channel on $n$ qubits has per-use classical
+        capacity at most $n$ bits, even in the presence of arbitrarily
+        many key modulators.
+  \item \textbf{E1--T1 (Classical XOR baseline).}
+        A purely classical one-time-pad style scheme providing a
+        comparison point for NVADE-based encryption.
+  \item \textbf{E1--T2 (Single-key NVADE phase encryption).}
+        A concrete instantiation with one diagonal NVADE-derived
+        phase key $M_1(K_1)$, empirically validated by hardware and
+        simulator runs.
+  \item \textbf{E1--T3 (Multi-key NVADE modulation, planned).}
+        A forthcoming unit that instantiates the above multi--key
+        model with $k\ge 2$ independent key modulators and explores
+        the tradeoff between reliability (decoding fidelity) and
+        security (advantage of missing-key adversaries) under the
+        global $n$--bit information limit.
+\end{itemize}
+
+Together, these results guarantee that the encryption layer of
+NVADE--SEC is grounded in a clean, dimension-aware information
+theory: $n$ qubits provide at most $n$ bits of accessible classical
+information per use, and every additional key must be justified as a
+security feature, not as a way to exceed that fundamental limit.
+
+\end{document}
+
