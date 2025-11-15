@@ -1,0 +1,15 @@
+{
+  "avg_honest_fidelity": 1.0,
+  "avg_partial_fidelities": [
+    0.04394051816713249,
+    0.05205212721417249,
+    0.0456478773256559
+  ],
+  "avg_partial_fidelity": 0.04721350756898696,
+  "label": "E2-T2_nvade_multishare_phase_numpy",
+  "message_bits": 6,
+  "n_keys": 3,
+  "n_qubits": 6,
+  "n_trials": 2000,
+  "seed": 424242
+}

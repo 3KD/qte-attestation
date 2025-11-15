@@ -1,0 +1,163 @@
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
+diff --git a/runs/2025-11-11T19-55-37Z_U58_attestation.json b/runs/2025-11-11T19-55-37Z_U58_attestation.json
+index 5e16f6a616dbd4ab94fe0f3f4ce37a1553fc8501..b8b32bba6334bf1bff10e07912dd93ccc6d6de82 100644
+--- a/runs/2025-11-11T19-55-37Z_U58_attestation.json
++++ b/runs/2025-11-11T19-55-37Z_U58_attestation.json
+@@ -1,98 +1,114 @@
+ {
+-  "ts": "2025-11-11T19-55-37Z",
+-  "backend": "ibm_torino",
+-  "n_qubits": 8,
+-  "shots_per_pair": 400,
+-  "num_pairs": 13,
+-  "total_shots": 5200,
+   "AUC": 0.9999994822485208,
+   "AUC_CI_95": [
+     0.999998446745562,
+     1.0
+   ],
+   "AUC_boot_mean": 0.9999995127126482,
+-  "TPR_at_1pct_FPR": 1.0,
+-  "min_PASS_r": 2,
+-  "aggregate_keyed_top3": "00000000:3310, 10000000:432, 00000001:389",
+-  "aggregate_forger_top3": "11111111:3076, 11111110:558, 11111011:305",
+   "ROC": [
+     {
+-      "r": 0,
+-      "TPR": 0.6365384615384615,
+       "FPR": 0.0,
++      "TPR": 0.6365384615384615,
++      "forger_succ": 0,
+       "keyed_succ": 3310,
+-      "forger_succ": 0
++      "r": 0
+     },
+     {
+-      "r": 1,
+-      "TPR": 0.9361538461538461,
+       "FPR": 0.0,
++      "TPR": 0.9361538461538461,
++      "forger_succ": 0,
+       "keyed_succ": 4868,
+-      "forger_succ": 0
++      "r": 1
+     },
+     {
+-      "r": 2,
+-      "TPR": 0.995,
+       "FPR": 0.0,
++      "TPR": 0.995,
++      "forger_succ": 0,
+       "keyed_succ": 5174,
+-      "forger_succ": 0
++      "r": 2
+     },
+     {
+-      "r": 3,
+-      "TPR": 0.9998076923076923,
+       "FPR": 0.0001923076923076923,
++      "TPR": 0.9998076923076923,
++      "forger_succ": 1,
+       "keyed_succ": 5199,
+-      "forger_succ": 1
++      "r": 3
+     },
+     {
+-      "r": 4,
+-      "TPR": 1.0,
+       "FPR": 0.0003846153846153846,
++      "TPR": 1.0,
++      "forger_succ": 2,
+       "keyed_succ": 5200,
+-      "forger_succ": 2
++      "r": 4
+     },
+     {
+-      "r": 5,
+-      "TPR": 1.0,
+       "FPR": 0.007884615384615384,
++      "TPR": 1.0,
++      "forger_succ": 41,
+       "keyed_succ": 5200,
+-      "forger_succ": 41
++      "r": 5
+     },
+     {
+-      "r": 6,
+-      "TPR": 1.0,
+       "FPR": 0.08557692307692308,
++      "TPR": 1.0,
++      "forger_succ": 445,
+       "keyed_succ": 5200,
+-      "forger_succ": 445
++      "r": 6
+     },
+     {
+-      "r": 7,
+-      "TPR": 1.0,
+       "FPR": 0.4084615384615385,
++      "TPR": 1.0,
++      "forger_succ": 2124,
+       "keyed_succ": 5200,
+-      "forger_succ": 2124
++      "r": 7
+     },
+     {
+-      "r": 8,
+-      "TPR": 1.0,
+       "FPR": 1.0,
++      "TPR": 1.0,
++      "forger_succ": 5200,
+       "keyed_succ": 5200,
+-      "forger_succ": 5200
++      "r": 8
+     }
+   ],
++  "TPR_at_1pct_FPR": 1.0,
++  "aggregate_forger_top3": "11111111:3076, 11111110:558, 11111011:305",
++  "aggregate_keyed_top3": "00000000:3310, 10000000:432, 00000001:389",
++  "backend": "ibm_torino",
++  "min_PASS_r": 2,
++  "n_qubits": 8,
++  "num_pairs": 13,
++  "provenance": {
++    "canon": {
++      "exclude": [
++        "provenance"
++      ],
++      "separators": [
++        ",",
++        ":"
++      ],
++      "sort_keys": true
++    },
++    "hmac": "3ecb4058b1c9dabf9039d1def8f8a20d35eecd4e2bd9bef1beab5f7169464432",
++    "key_id": "dev-key-01",
++    "sha256": "348ed8c31a22274e275a8819110682030e3cc64a7dbc1f246883353fd838a655",
++    "ts": "2025-11-11T21:30:06Z"
++  },
++  "shots_per_pair": 400,
+   "source_paths": [
+     "/Users/erik/Documents/qte-attestation/runs/2025-11-11T19-55-22Z_submit_counts.jsonl",
+     "/Users/erik/Documents/qte-attestation/runs/2025-11-11T19-55-09Z_submit_counts.jsonl",
+     "/Users/erik/Documents/qte-attestation/runs/2025-11-11T19-54-52Z_submit_counts.jsonl",
+     "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-41-37Z_submit_counts.jsonl",
+     "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-41-26Z_submit_counts.jsonl",
+     "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-41-15Z_submit_counts.jsonl",
+     "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-41-04Z_submit_counts.jsonl",
+     "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-40-48Z_submit_counts.jsonl",
+     "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-40-37Z_submit_counts.jsonl",
+     "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-40-24Z_submit_counts.jsonl",
+     "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-40-13Z_submit_counts.jsonl",
+     "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-40-02Z_submit_counts.jsonl",
+     "/Users/erik/Documents/qte-attestation/runs/2025-11-11T14-39-50Z_submit_counts.jsonl"
+-  ]
+-}
+\ No newline at end of file
++  ],
++  "total_shots": 5200,
++  "ts": "2025-11-11T19-55-37Z"
++}
+ 
+EOF
+)

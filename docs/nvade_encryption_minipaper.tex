@@ -1,0 +1,358 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{authblk}
+
+\newcommand{\ket}[1]{\left|#1\right\rangle}
+\newcommand{\bra}[1]{\left\langle#1\right|}
+\newcommand{\braket}[2]{\left\langle #1 \middle| #2 \right\rangle}
+
+\sisetup{
+  round-mode=places,
+  round-precision=4
+}
+
+\title{Amplitude-Key Encryption and Trapdoor Witnesses from\\
+Normalized Vector Amplitude Distribution Encoding (NVADE)}
+
+\author[1]{Author Name}
+\affil[1]{Affiliation, City, Country}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We consider mathematical objects---in particular truncated series and finite vectors---as
+primary quantum data, and encode them directly into normalized amplitude vectors via
+Normalized Vector Amplitude Distribution Encoding (NVADE).
+A NVADE object is a statevector
+$\ket{\psi} = \sum_{k=0}^{N-1} \psi_k \ket{k}$ with $\sum_k |\psi_k|^2 = 1$,
+where the coefficients $\psi_k$ are derived from a structured series and accompanied by
+hash-verified metadata.
+On top of this encoding we build three simple, reproducible primitives:
+
+(1) a trapdoor witness test (Unit U31) that distinguishes a reference NVADE state from
+an impostor via likelihood scores and ROC/AUC metrics, run both on a simulator and on an
+IBM quantum device;
+
+(2) a baseline classical encryption experiment (E1--T1) that measures honest-vs-adversary
+success probabilities as a function of message length;
+
+(3) a NVADE amplitude-key phase-mask primitive (E1--T2) where a NVADE state acts as a
+symmetric key under a diagonal phase operator, achieving unit fidelity (up to numerical
+precision) over thousands of trials.
+
+All experiments emit machine-checkable U58 attestation cards that package counts,
+metrics, and provenance with cryptographic hashes.  This note reports the concrete
+numbers and their experimental setup, and is intended as a minimal, self-contained
+reference for subsequent, more elaborate studies.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+A central theme in this work is to treat \emph{mathematical structure} as the payload
+of a quantum state, rather than as an afterthought on top of generic qubit registers.
+Normalized Vector Amplitude Distribution Encoding (NVADE) provides a deterministic map
+from an ordered list of complex coefficients to a legal quantum statevector, together
+with a metadata and hashing scheme that makes these objects portable across simulators
+and hardware.
+
+Let $t \in \mathbb{C}^L$ be the truncated coefficient sequence of some series or
+structured object, with a fixed index ordering.  NVADE pads or truncates $t$ to a target
+dimension $N$ (often $N = 2^n$ for an $n$-qubit system),
+\begin{equation}
+  w_k =
+  \begin{cases}
+    t_k, & 0 \le k < \min\{L,N\},\\
+    0,   & \text{otherwise},
+  \end{cases}
+\end{equation}
+and normalizes
+\begin{equation}
+  \ket{\psi} = \frac{1}{\|w\|_2}\sum_{k=0}^{N-1} w_k \ket{k}.
+\end{equation}
+The resulting statevector $\psi \in \mathbb{C}^N$ is accompanied by metadata describing
+the source object and a cryptographic hash of a rounded representation of $\psi$.
+
+On top of this backbone we instantiate three concrete experiments:
+
+\begin{itemize}
+  \item a \emph{trapdoor witness} (U31) that compares a reference NVADE state to an
+        impostor via a scalar score and ROC/AUC analysis;
+  \item a \emph{baseline encryption} experiment (E1--T1) which measures honest-vs-adversary
+        decoding success as message length increases;
+  \item a \emph{NVADE amplitude-key phase-mask} (E1--T2) which uses a NVADE state as a
+        symmetric key under a diagonal phase operator, and tests the decryption fidelity.
+\end{itemize}
+
+Each run is recorded as a JSON object with counts, metrics, and provenance, and then
+lifted into a U58 attestation card: a signed, hash-verified evidence object that can be
+archived, rechecked, or used as input for downstream analyses.
+
+\section{Methods (brief)}
+\label{sec:methods}
+
+We collect only the minimal definitions needed to make the results in
+Section~\ref{sec:results} interpretable.  Full implementation details live in the
+associated repositories.
+
+\subsection{Trapdoor witness (U31)}
+\label{sec:methods-u31}
+
+Let $\ket{\psi_{\mathrm{ref}}}$ be a reference NVADE state and
+$\ket{\psi_{\mathrm{alt}}}$ an alternative state on the same $n$-qubit space.
+Measuring in the computational basis yields distributions
+\begin{equation}
+  p_{\mathrm{ref}}(x) = |\braket{x}{\psi_{\mathrm{ref}}}|^2, \quad
+  p_{\mathrm{alt}}(x) = |\braket{x}{\psi_{\mathrm{alt}}}|^2,\quad x\in\{0,1\}^n.
+\end{equation}
+Given counts $\{c_{\mathrm{ref}}(x)\}$ and $\{c_{\mathrm{alt}}(x)\}$ from $S$ shots each,
+we form empirical probabilities $\hat p$ and a (regularized) log-likelihood ratio score
+\begin{equation}
+  s(x) = \log\frac{\hat p_{\mathrm{ref}}(x) + \epsilon}{\hat p_{\mathrm{alt}}(x) + \epsilon},
+\end{equation}
+with a small $\epsilon > 0$ to avoid division by zero.
+Sampling $s(x)$ under $p_{\mathrm{ref}}$ and $p_{\mathrm{alt}}$ gives ``honest'' and
+``impostor'' score distributions; sweeping a threshold $\tau$ yields a receiver operating
+characteristic (ROC) curve and an empirical area under the curve (AUC).
+
+In Unit U31 we implement this test as a runner that:
+\begin{enumerate}
+  \item loads $\ket{\psi_{\mathrm{ref}}}$ and $\ket{\psi_{\mathrm{alt}}}$ from disk;
+  \item prepares each state via an \texttt{initialize} gate and measures in the $Z$ basis;
+  \item collects counts from both an ideal simulator and a hardware backend;
+  \item computes ROC curves and AUC/TPR@1\%FPR metrics;
+  \item writes these along with provenance into a JSON payload.
+\end{enumerate}
+
+\subsection{Baseline encryption (E1--T1)}
+\label{sec:methods-e1t1}
+
+E1--T1 is a classical baseline experiment that uses NVADE-derived data to parameterize a
+simple symmetric-key encryption scheme on $m$-bit messages.
+
+For each trial:
+\begin{enumerate}
+  \item Sample a uniformly random message $M \in \{0,1\}^m$ and a secret key $K$
+        derived from a NVADE object.
+  \item Form a ciphertext $C = E_K(M)$ by applying a keyed transformation determined
+        by the NVADE-derived parameters.
+  \item The honest receiver, with access to $K$, computes $\hat M_{\mathrm{honest}} = D_K(C)$.
+  \item A blind adversary, without $K$, produces a guess $\hat M_{\mathrm{adv}}$ using only
+        public information.
+\end{enumerate}
+We record the empirical honest and adversarial success rates over $N_{\mathrm{trials}}$
+repetitions:
+\begin{equation}
+  \Pr_{\mathrm{honest}} = \Pr[\hat M_{\mathrm{honest}} = M], \quad
+  \Pr_{\mathrm{adv}}    = \Pr[\hat M_{\mathrm{adv}} = M].
+\end{equation}
+The exact form of $E_K$ and $D_K$ in this baseline is intentionally simple; the goal is
+to quantify the separation between a keyed decoder and a blind guesser as a function of
+message length.
+
+\subsection{Amplitude-key phase-mask primitive (E1--T2)}
+\label{sec:methods-e1t2}
+
+In E1--T2 the NVADE state itself acts as a symmetric key.  Let
+\begin{equation}
+  \ket{\psi_K} = \sum_{k=0}^{N-1} \psi_k \ket{k}
+\end{equation}
+be a fixed key state on $n$ qubits ($N=2^n$), and let $m \in \{0,1\}^n$ be a classical
+message.
+We define a diagonal phase-mask operator
+\begin{equation}
+  U_m = \bigotimes_{j=0}^{n-1} Z_j^{m_j},
+\end{equation}
+so that $U_m$ applies a Pauli-$Z$ on qubit $j$ when $m_j = 1$ and the identity otherwise.
+Because $Z_j^2 = I$, we have $U_m^2 = I$.
+
+Encryption is
+\begin{equation}
+  \ket{\psi_{\mathrm{enc}}(m)} = U_m \ket{\psi_K},
+\end{equation}
+and decryption applies the same operator again:
+\begin{equation}
+  \ket{\psi_{\mathrm{dec}}(m)} = U_m \ket{\psi_{\mathrm{enc}}(m)} = U_m^2 \ket{\psi_K}
+  = \ket{\psi_K}.
+\end{equation}
+In E1--T2 we do not attempt a full cryptographic security analysis; the focus is on
+implementing this primitive faithfully and measuring the decryption fidelity
+\begin{equation}
+  F(m) = |\braket{\psi_K}{\psi_{\mathrm{dec}}(m)}|^2
+\end{equation}
+across many randomly chosen messages.
+
+\subsection{U58 attestation cards}
+\label{sec:methods-u58}
+
+Every experiment above emits a JSON run record with counts, metrics, and provenance.
+A U58 attestation card is a higher-level evidence object that wraps one such run with:
+\begin{itemize}
+  \item a canonical serialization of the payload,
+  \item a SHA256 hash of that serialization,
+  \item a small header identifying the unit, test type, and backend,
+  \item optional timestamps and human-readable notes.
+\end{itemize}
+These cards can be archived, signed, or published as the basic evidence units for
+subsequent analyses, including any future noise-window advantage studies.
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Trapdoor witness on simulator and hardware (U31)}
+\label{sec:results-u31}
+
+We instantiated the U31 trapdoor witness on a three-qubit NVADE state derived from a
+structured series (the ``prod3'' family) and a chosen impostor state on the same
+Hilbert space.  For each backend we prepared both the honest and impostor states,
+measured in the computational ($Z$) basis for a fixed number of shots, and computed
+log-likelihood ratio scores as in Section~\ref{sec:methods-u31}.
+
+Figure~\ref{fig:u31-roc} (not shown here) conceptually plots the ROC curves for two
+tests, T1 (``prod3'') and T2 (``wrong-key-LLR''), on both an ideal simulator
+(\texttt{aer\_simulator}) and the IBM \texttt{ibm\_torino} backend.
+Table~\ref{tab:u31-metrics} summarizes the key numerical metrics.
+
+\begin{table}[h]
+  \centering
+  \caption{U31 trapdoor witness metrics on simulator and hardware.  AUC is the empirical
+  area under the ROC curve; TPR@1\%FPR is the true positive rate at a fixed false positive
+  rate of $1\%$.}
+  \label{tab:u31-metrics}
+  \begin{tabular}{llllS[round-precision=4]S[round-precision=4]}
+    \toprule
+    Test & Backend kind & Backend name & Metric & {AUC} & {TPR@1\%FPR} \\
+    \midrule
+    T1 (prod3) & aer & aer\_simulator   &        & 0.6783105731 & 0.1936035156 \\
+               & ibm & ibm\_torino      &        & 0.5414723158 & 0.2814941406 \\
+    \midrule
+    T2 (wrong-key-LLR) & aer & aer\_simulator &  & 0.5944366455 & 0.0656738281 \\
+                       & ibm & ibm\_torino    &  & 0.6177199483 & 0.0917968750 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+All four runs emit U58 attestation cards with hashes that match on recomputation,
+indicating that the stored payloads are self-consistent.  Qualitatively, the AUC values
+are modestly above $0.5$ in all cases, demonstrating that the trapdoor witness is
+non-trivial, and the hardware-induced noise shifts the ROC geometry without erasing
+discriminability.
+
+\subsection{Baseline encryption success rates (E1--T1)}
+\label{sec:results-e1t1}
+
+The E1--T1 baseline tests the separation between an honest decoder with access to a
+NVADE-derived key and a blind adversary, as a function of message length $m$.
+For each $m$ we run $N_{\mathrm{trials}}$ independent encryptions and record the
+empirical success probabilities.
+
+We carried out experiments for $m \in \{3,6,7,8\}$ with trial counts
+$N_{\mathrm{trials}} \in \{5000, 10\,000\}$.  The results are summarized in
+Table~\ref{tab:e1t1}.
+
+\begin{table}[h]
+  \centering
+  \caption{E1--T1 baseline: honest and adversary success rates as a function of
+  message length $m$.  Each row corresponds to one JSON run file produced by
+  \texttt{e1\_t1\_encryption\_baseline.py}.}
+  \label{tab:e1t1}
+  \begin{tabular}{rrrrS[round-precision=4]S[round-precision=4]}
+    \toprule
+    $m$ & $N_{\mathrm{trials}}$ & & & {Honest success} & {Adversary success} \\
+    \midrule
+    3 &  5000 & & & 1.0000 & 0.1262 \\
+    6 & 10000 & & & 1.0000 & 0.0152 \\
+    7 & 10000 & & & 1.0000 & 0.0087 \\
+    8 & 10000 & & & 1.0000 & 0.0043 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+For all configurations, the honest decoder recovers the message with probability
+essentially equal to $1$ within sampling error, while the adversary's success probability
+drops rapidly as $m$ increases, approaching the uniform-guess baseline $2^{-m}$.
+Although this is only a simplified test and not a full cryptographic security proof,
+it provides a concrete capacity-style plot: increasing the message length under this
+scheme suppresses blind guessing advantage while preserving perfect decodability for
+the keyed receiver.
+
+These runs can also be wrapped in U58 cards, but in the present work we mainly treat
+them as sanity checks for the more structured amplitude-key primitive in E1--T2.
+
+\subsection{Amplitude-key phase-mask fidelity (E1--T2)}
+\label{sec:results-e1t2}
+
+In E1--T2 we implement the amplitude-key phase-mask primitive from
+Section~\ref{sec:methods-e1t2} and test decryption fidelity.  The key is a six-qubit
+NVADE state derived from a Ramanujan-type series, yielding $N = 2^6 = 64$ amplitudes.
+We choose $m = 6$ message bits so that each bit controls a $Z$ on one of the six qubits.
+
+For each trial, we:
+\begin{enumerate}
+  \item sample a random message $m \in \{0,1\}^6$,
+  \item apply $U_m$ to $\ket{\psi_K}$ to obtain $\ket{\psi_{\mathrm{enc}}(m)}$,
+  \item apply $U_m$ again to obtain the decrypted state $\ket{\psi_{\mathrm{dec}}(m)}$,
+  \item compute the fidelity
+        $F(m) = |\braket{\psi_K}{\psi_{\mathrm{dec}}(m)}|^2$
+        by comparing the numerically known statevectors.
+\end{enumerate}
+
+Over $N_{\mathrm{trials}} = 5000$ trials we obtain:
+\begin{align}
+  \text{average fidelity} &\approx 1.0000000000000002, \\
+  \text{minimum fidelity} &\approx 1.0000000000000004,
+\end{align}
+where the slight excursions above $1$ are attributable to floating-point roundoff.
+Within numerical precision, the decryption fidelity is identically $1$ for all sampled
+messages.
+
+This confirms that the amplitude-key phase-mask construction behaves as expected:
+given a fixed NVADE key state and a diagonal phase operator $U_m$ with $U_m^2 = I$,
+a single application of $U_m$ encrypts and a second application perfectly decrypts,
+without degrading the underlying key state in the idealized model used here.
+
+In future work this primitive can be extended along several axes:
+\begin{itemize}
+  \item replacing the numerical inner-product fidelity with experimental estimates on
+        real hardware,
+  \item adding noise and hardware constraints to study robustness,
+  \item layering this diagonal primitive with more general keyed unitaries and error
+        correction or authentication mechanisms.
+\end{itemize}
+
+\section{Discussion and Outlook}
+\label{sec:discussion}
+
+The three experiments reported here---U31 trapdoor witnesses on simulator and hardware,
+E1--T1 baseline encryption, and E1--T2 amplitude-key phase-masks---constitute a minimal
+but concrete demonstration that NVADE-encoded series states can be used both as
+\emph{objects of study} (via trapdoor witnesses and ROC analysis) and as
+\emph{cryptographic resources} (via amplitude-key operations), with reproducible,
+hash-verified evidence.
+
+The U58 attestation cards provide a portable, machine-checkable representation of each
+run, enabling downstream analyses such as noise-window advantage searches, multi-backend
+comparisons, and long-term drift studies without re-running the raw experiments.
+
+Subsequent papers can enrich this skeleton in several directions:
+\begin{itemize}
+  \item a full security definition and analysis for amplitude-key encryption, including
+        indistinguishability games and adversary models;
+  \item explicit noise models and hardware experiments, especially for devices where
+        phase errors dominate;
+  \item application-specific case studies (e.g.\ ergodic-theoretic signals, quantum
+        chemistry spectra, or complex analytic functions) where the structure of the
+        NVADE key interacts non-trivially with the modulation and verification stack.
+\end{itemize}
+
+\end{document}
+

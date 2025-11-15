@@ -1,0 +1,14 @@
+{
+  "avg_partial_bit_error_rate": 0.4991125,
+  "honest_bit_error_rate": 0.0,
+  "label": "E2-T1_multishare_xor_baseline",
+  "message_bits": 8,
+  "n_keys": 3,
+  "n_trials": 10000,
+  "partial_bit_error_rates": [
+    0.49895,
+    0.4998375,
+    0.49855
+  ],
+  "seed": 424242
+}
