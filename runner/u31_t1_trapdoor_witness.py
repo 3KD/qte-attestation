@@ -11,6 +11,7 @@ import numpy as np
 
 
 def _ensure_unit(vec: np.ndarray) -> np.ndarray:
+    """Return vec/||vec||, error on zero."""
     vec = np.asarray(vec, dtype=complex).reshape(-1)
     nrm = np.linalg.norm(vec)
     if nrm == 0:
@@ -19,6 +20,7 @@ def _ensure_unit(vec: np.ndarray) -> np.ndarray:
 
 
 def _build_prob_map(vec: np.ndarray) -> Dict[str, float]:
+    """Map bitstrings -> Born probabilities |psi_k|^2."""
     vec = np.asarray(vec, dtype=complex).reshape(-1)
     n = int(round(math.log2(vec.size)))
     if 1 << n != vec.size:
@@ -33,6 +35,7 @@ def _build_prob_map(vec: np.ndarray) -> Dict[str, float]:
 
 
 def _scores_from_counts(counts: Dict[str, int], prob_map: Dict[str, float]) -> np.ndarray:
+    """Log-likelihood scores per shot: log p_ref(bitstring)."""
     scores: List[float] = []
     eps = 1e-15
     for bitstring, c in counts.items():
@@ -52,10 +55,12 @@ class RocResult:
 
 
 def _compute_roc(scores_pos: np.ndarray, scores_neg: np.ndarray) -> RocResult:
+    """Standard ROC + AUC from positive/negative score samples."""
     pos = np.asarray(scores_pos, dtype=float).reshape(-1)
     neg = np.asarray(scores_neg, dtype=float).reshape(-1)
     if pos.size == 0 or neg.size == 0:
         raise ValueError("Need at least one positive and one negative score.")
+
     labels = np.concatenate([np.ones_like(pos), np.zeros_like(neg)])
     scores = np.concatenate([pos, neg])
 
@@ -110,7 +115,7 @@ def _compute_roc(scores_pos: np.ndarray, scores_neg: np.ndarray) -> RocResult:
 
 
 def _build_circuit_from_vector(vec: np.ndarray):
-    """Aer path: prepare |psi> from vec with initialize()."""
+    """Amplitude loader: prepare |psi> from vec via initialize(), then measure."""
     from qiskit import QuantumCircuit  # type: ignore
 
     vec = _ensure_unit(vec)
@@ -123,27 +128,12 @@ def _build_circuit_from_vector(vec: np.ndarray):
     return qc
 
 
-def _build_circuit_product3():
-    """IBM path: hard-coded 3-qubit product state via RY gates.
-
-    |psi> = (cos t0 |0> + sin t0 |1>) ⊗ (cos t1 |0> + sin t1 |1>) ⊗ (cos t2 |0> + sin t2 |1>)
-    Angles must match the generator used for the .npy ref state.
-    """
-    from qiskit import QuantumCircuit  # type: ignore
-
-    n = 3
-    qc = QuantumCircuit(n, n)
-    t0 = math.pi / 3.0
-    t1 = math.pi / 4.0
-    t2 = math.pi / 6.0
-    qc.ry(2 * t0, 0)
-    qc.ry(2 * t1, 1)
-    qc.ry(2 * t2, 2)
-    qc.measure(range(n), range(n))
-    return qc
-
-
-def _choose_backend(backend_kind: str, n_qubits: int, backend_name: Optional[str], send_ibm: bool):
+def _choose_backend(
+    backend_kind: str,
+    n_qubits: int,
+    backend_name: Optional[str],
+    send_ibm: bool,
+):
     """Return (backend, backend_name_str)."""
     if backend_kind == "aer":
         try:
@@ -156,7 +146,7 @@ def _choose_backend(backend_kind: str, n_qubits: int, backend_name: Optional[str
             bk = AerSimulator()
         return bk, getattr(bk, "name", "aer_simulator")
 
-    # IBM Runtime
+    # IBM Runtime path
     if not send_ibm:
         raise SystemExit(
             "Refusing to use IBM backend without --send-ibm flag. "
@@ -185,22 +175,26 @@ def _choose_backend(backend_kind: str, n_qubits: int, backend_name: Optional[str
 
 
 def _run_counts(qc, backend, backend_kind: str, shots: int, seed: Optional[int]) -> Dict[str, int]:
-    """Run qc on Aer or IBM Runtime and return counts."""
+    """Run qc on Aer or IBM Runtime and return counts dict."""
     from qiskit import transpile  # type: ignore
-    try:
-        from qiskit_ibm_runtime import SamplerV2 as Sampler, IBMBackend  # type: ignore
-    except Exception:
-        Sampler = None
-        IBMBackend = None
 
-    if backend_kind == "ibm" and Sampler is not None and IBMBackend is not None and isinstance(backend, IBMBackend):
-        tqc = transpile(qc, backend, seed_transpiler=seed)
-        sampler = Sampler(mode=backend)
-        job = sampler.run([tqc], shots=shots)
-        pub_result = job.result()[0]
-        counts = pub_result.join_data().get_counts()
-        return {str(k): int(v) for k, v in dict(counts).items()}
+    if backend_kind == "ibm":
+        # Use SamplerV2 primitives on IBM, since backend.run() is disabled there.
+        try:
+            from qiskit_ibm_runtime import SamplerV2, IBMBackend  # type: ignore
+        except Exception as exc:
+            raise RuntimeError("qiskit-ibm-runtime SamplerV2 is required for backend=ibm") from exc
 
+        if isinstance(backend, IBMBackend):
+            tqc = transpile(qc, backend, seed_transpiler=seed)
+            sampler = SamplerV2(mode=backend)
+            job = sampler.run([tqc], shots=shots)
+            pub_result = job.result()[0]
+            data = pub_result.join_data()
+            counts = data.get_counts()
+            return {str(k): int(v) for k, v in dict(counts).items()}
+
+    # Default / Aer path (and any non-IBM backend that still supports .run)
     tqc = transpile(qc, backend, seed_transpiler=seed)
     try:
         job = backend.run(tqc, shots=shots, seed_simulator=seed)
@@ -212,7 +206,9 @@ def _run_counts(qc, backend, backend_kind: str, shots: int, seed: Optional[int])
 
 
 def main(argv: Optional[list[str]] = None) -> None:
-    p = argparse.ArgumentParser(description="U31-T1 trapdoor witness ROC harness (Aer / IBM).")
+    p = argparse.ArgumentParser(
+        description="U31-T1 trapdoor witness ROC harness (Aer / IBM) with amplitude loader."
+    )
     p.add_argument(
         "--ref-psi",
         required=True,
@@ -221,8 +217,10 @@ def main(argv: Optional[list[str]] = None) -> None:
     p.add_argument(
         "--alt-psi",
         required=False,
-        help=".npy file with amplitudes for the impostor state. "
-             "If omitted, a permuted/rephased version of ref-psi is used.",
+        help=(
+            ".npy file with amplitudes for the impostor state. "
+            "If omitted, a permuted/rephased version of ref-psi is used."
+        ),
     )
     p.add_argument(
         "--backend",
@@ -233,7 +231,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     p.add_argument(
         "--backend-name",
         default=None,
-        help="Optional explicit backend name (e.g. ibm_torino).",
+        help="Optional explicit backend name (e.g. ibm_fez).",
     )
     p.add_argument(
         "--shots",
@@ -262,9 +260,11 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     rng = np.random.default_rng(args.seed)
 
+    # Load reference state
     ref_vec = np.load(args.ref_psi)
     ref_vec = np.asarray(ref_vec, dtype=complex).reshape(-1)
 
+    # Build impostor state
     if args.alt_psi:
         alt_vec = np.load(args.alt_psi)
         alt_vec = np.asarray(alt_vec, dtype=complex).reshape(-1)
@@ -275,22 +275,18 @@ def main(argv: Optional[list[str]] = None) -> None:
         phases = np.exp(1j * 2 * np.pi * rng.random(ref_vec.size))
         alt_vec = ref_vec[perm] * phases
 
-    prob_map = _build_prob_map(ref_vec)
-
     n_qubits = int(round(math.log2(ref_vec.size)))
     if 1 << n_qubits != ref_vec.size:
         raise ValueError("ref-psi length is not a power of two.")
 
-    # Build circuits
-    if args.backend == "aer":
-        qc_ref = _build_circuit_from_vector(ref_vec)
-        qc_alt = _build_circuit_from_vector(alt_vec)
-    else:
-        if n_qubits != 3:
-            raise SystemExit("IBM path currently implemented only for 3-qubit product state.")
-        qc_ref = _build_circuit_product3()
-        qc_alt = _build_circuit_product3()
+    # Build log-likelihood map from honest amplitudes
+    prob_map = _build_prob_map(ref_vec)
 
+    # Build amplitude-loader circuits (same construction for Aer/IBM)
+    qc_ref = _build_circuit_from_vector(ref_vec)
+    qc_alt = _build_circuit_from_vector(alt_vec)
+
+    # Choose backend
     backend, backend_name = _choose_backend(
         backend_kind=args.backend,
         n_qubits=n_qubits,
@@ -298,14 +294,30 @@ def main(argv: Optional[list[str]] = None) -> None:
         send_ibm=args.send_ibm,
     )
 
-    counts_ref = _run_counts(qc_ref, backend, backend_kind=args.backend, shots=args.shots, seed=args.seed)
-    counts_alt = _run_counts(qc_alt, backend, backend_kind=args.backend, shots=args.shots, seed=args.seed + 1)
+    # Run counts for honest / impostor
+    counts_ref = _run_counts(
+        qc_ref,
+        backend,
+        backend_kind=args.backend,
+        shots=args.shots,
+        seed=args.seed,
+    )
+    counts_alt = _run_counts(
+        qc_alt,
+        backend,
+        backend_kind=args.backend,
+        shots=args.shots,
+        seed=args.seed + 1,
+    )
 
+    # Convert counts to score samples
     scores_pos = _scores_from_counts(counts_ref, prob_map)
     scores_neg = _scores_from_counts(counts_alt, prob_map)
 
+    # ROC + AUC
     roc = _compute_roc(scores_pos, scores_neg)
 
+    # Persist JSON payload
     out_dir = os.path.dirname(args.out) or "."
     os.makedirs(out_dir, exist_ok=True)
 
@@ -339,6 +351,25 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, sort_keys=True)
+
+    # Human-readable summary for the terminal
+    print("== U31-T1 trapdoor witness ==")
+    print(f" file: {args.out}")
+    print(f" backend_kind: {args.backend}")
+    print(f" backend_name: {backend_name}")
+    print(f" shots_per_class: {int(args.shots)}")
+    print(f" n_qubits: {n_qubits}")
+    print(f" auc: {roc.auc}")
+    print(f" tpr_at_1pct_fpr: {roc.tpr_at_1pct_fpr}")
+    print(" scores_summary:")
+    print(
+        f"  honest: count={scores_pos.size}, "
+        f"mean={scores_pos.mean():.6f}, std={scores_pos.std():.6f}"
+    )
+    print(
+        f"  impostor: count={scores_neg.size}, "
+        f"mean={scores_neg.mean():.6f}, std={scores_neg.std():.6f}"
+    )
 
 
 if __name__ == "__main__":
